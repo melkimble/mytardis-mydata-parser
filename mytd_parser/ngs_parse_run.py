@@ -1,3 +1,9 @@
+"""
+ngs_parse_run.py
+Filter and parse MiSeq Illumina runs and submit data via MyData to MyTardis
+Created By: mkimble
+"""
+
 from . import settings
 import os, glob
 from pathlib import Path
@@ -11,7 +17,7 @@ from .logger_settings import api_logger
 from pathlib import *
 
 
-class ParseDirs:
+class MiSeqParser:
     def __init__(self):
         self.MAIN_INPUT_DIR = settings.MAIN_INPUT_DIR
         self.MAIN_COPY_DIR = settings.MAIN_COPY_DIR

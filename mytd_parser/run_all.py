@@ -1,7 +1,7 @@
 import pandas as pd
-from mytd_parser.ngs_parse_run import ParseDirs
+from mytd_parser.ngs_parse_run import MiSeqParser
 
-parse = ParseDirs()
+parser = MiSeqParser()
 
-parse.copy_metadata_dirs()
+parser.copy_metadata_dirs()
 

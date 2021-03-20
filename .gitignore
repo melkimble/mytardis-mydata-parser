@@ -94,6 +94,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+/mytardis-mydata-parser-env/*
 
 # Spyder project settings
 .spyderproject
@@ -112,3 +113,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+#pycharm
+.idea/vcs.xml
+
+# NGS Data
+/NGS_Outputs/*
