@@ -119,3 +119,6 @@ dmypy.json
 
 # NGS Data
 /NGS_Outputs/*
+
+#mydata-python git repo
+/mydata-python/

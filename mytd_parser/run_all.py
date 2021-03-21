@@ -3,5 +3,12 @@ from mytd_parser.ngs_parse_run import MiSeqParser
 
 parser = MiSeqParser()
 
-parser.copy_metadata_dirs()
+# not using mydata-python; just parsing and triggering upload in mydata.exe on daily timer
+parser.parse_fastq_files()
+#parser.complete_copy_upload()
+
+# mydata-python breaking on upload - FileNotFoundError: [WinError 2] The system cannot find the file specified
+# added issue to mydata-python repo
+#parser.upload_mydata_py()
+#parser.upload_mydata_subprocess()
 
