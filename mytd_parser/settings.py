@@ -9,8 +9,12 @@ BASE_DIR = os.path.dirname(current_working_dir)
 BASE_DIR = BASE_DIR.replace('\\', '/')
 
 MAIN_INPUT_DIR = BASE_DIR+"/NGS_Outputs/Staging/"
-MAIN_COPY_DIR = BASE_DIR+"/NGS_Outputs/Original/"
-MAIN_OUTPUT_DIR = BASE_DIR+"/NGS_Outputs/Parsed/"
+MAIN_COPY_DIR = BASE_DIR+"/NGS_Outputs/Backup/"
+MAIN_OUTPUT_DIR = BASE_DIR+"/NGS_Outputs/Upload/"
+
+MAIN_COPY_ORIGINAL_DIR = MAIN_COPY_DIR + "Original/"
+MAIN_COPY_PARSED_DIR = MAIN_COPY_DIR + "Parsed/"
+
 
 # error logging
 LOG_FILE_DIR = BASE_DIR+'/logs/'

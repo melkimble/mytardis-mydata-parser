@@ -13,7 +13,7 @@ from pathlib import *
 from distutils.dir_util import copy_tree
 from subprocess import PIPE, run
 import datetime
-
+import pathlib
 
 def unique(list1):
     # insert the list to the set
@@ -25,12 +25,32 @@ def unique(list1):
 class MiSeqParser:
     def __init__(self):
         self.MAIN_INPUT_DIR = settings.MAIN_INPUT_DIR
-        self.MAIN_COPY_DIR = settings.MAIN_COPY_DIR
+        #self.MAIN_COPY_DIR = settings.MAIN_COPY_DIR
+        self.MAIN_COPY_ORIGINAL_DIR = settings.MAIN_COPY_ORIGINAL_DIR
+        self.MAIN_COPY_PARSED_DIR = settings.MAIN_COPY_PARSED_DIR
         self.MAIN_OUTPUT_DIR = settings.MAIN_OUTPUT_DIR
         # mydata cfgs
         self.DATA_DIRECTORY = settings.DATA_DIRECTORY
         self.FOLDER_STRUCTURE = settings.FOLDER_STRUCTURE
         self.MYTARDIS_URL = settings.MYTARDIS_URL
+
+    def check_rta_complete(self, input_run_dir):
+        """
+         check to see if RTAComplete.txt exists
+        """
+        try:
+            #input_run_dir = MAIN_INPUT_DIR + project + "/" + run_id + "/"
+            api_logger.info('Start: checking RTAComplete.txt ' + str(input_run_dir))
+            rta_file = pathlib.Path(input_run_dir+"RTAComplete.txt")
+            if rta_file.exists():
+                api_logger.info('End: RTAComplete.txt exists')
+                return(True)
+            else:
+                # if RTAComplete.txt does not exist, then we do not want to proceed with processing the code.
+                api_logger.info('End: RTAComplete.txt does not exist - sequencing run not complete')
+                return(False)
+        except Exception as err:
+            raise RuntimeError("** Error: check_rta_complete Failed (" + str(err) + ")")
 
     def get_dirs(self):
         """
@@ -43,6 +63,7 @@ class MiSeqParser:
             fastq_dirs = []
             projects = []
             num_align_subdirs = []
+            rta_completes = []
             project_dirs = glob.glob(os.path.join(self.MAIN_INPUT_DIR, '*/'))
 
             for project_dir in project_dirs:
@@ -54,6 +75,11 @@ class MiSeqParser:
                 # grab sequencing folder directory with most recent date for each project
                 run_dir = max(glob.glob(os.path.join(project_dir, '*/')), key=os.path.getmtime)
                 run_dir = run_dir.replace('\\', '/')
+
+                if self.check_rta_complete(run_dir):
+                    rta_complete = True
+                else:
+                    rta_complete = False
 
                 # grab run_id from path name
                 run_id = Path(run_dir).name
@@ -88,11 +114,15 @@ class MiSeqParser:
                     align_subdirs.append(align_subdir)
                     fastq_dirs.append(fastq_dir)
                     num_align_subdirs.append(num_align_subdir)
-            dirs_df = pd.DataFrame(list(zip(projects, run_dirs, run_ids, align_subdirs, fastq_dirs, num_align_subdirs)),
-                                   columns=['project', 'run_dir', 'run_id', 'align_subdir', 'fastq_dir', 'num_align_subdir'])
-            return(dirs_df)
+                    rta_completes.append(rta_complete)
+            dirs_df = pd.DataFrame(list(zip(projects, run_dirs, run_ids, align_subdirs, fastq_dirs, num_align_subdirs,rta_completes)),
+                                   columns=['project', 'run_dir', 'run_id', 'align_subdir', 'fastq_dir', 'num_align_subdir','rta_complete'])
+            # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
+            dirs_df_rta_complete = dirs_df[dirs_df["rta_complete"] == True]
+            return(dirs_df_rta_complete)
         except Exception as err:
             raise RuntimeError("** Error: get_dirs Failed (" + str(err) + ")")
+
     def copy_metadata_dirs(self):
         """
          copy metadata dirs and files
@@ -369,6 +399,7 @@ class MiSeqParser:
         try:
             from mydata.models.settings.serialize import save_settings_to_disk, load_settings
             from mydata.conf import settings
+
             dirs_df = self.parse_fastq_files()
             api_logger.info('Start: set config')
             if settings.data_directory != self.DATA_DIRECTORY: settings.data_directory = self.DATA_DIRECTORY
@@ -425,23 +456,45 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: upload_mydata_py Failed (" + str(err) + ")")
 
-
-    def move_staging_backup(self):
+    def move_parsing_backup(self):
         """
-         move data out of staging folder and to backup folder
+         move parsed files from upload to backup; must happen after mydata upload is complete
         """
         try:
-            dirs_df = self.get_dirs()
-            MAIN_INPUT_DIR = self.MAIN_INPUT_DIR
-            MAIN_COPY_DIR = self.MAIN_COPY_DIR
+            dirs_df = self.scan_mydata_py()
+            MAIN_OUTPUT_DIR = self.MAIN_OUTPUT_DIR
+            MAIN_COPY_PARSED_DIR = self.MAIN_COPY_PARSED_DIR
             dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
             # print(dirs_group_df)
 
             for index, row in dirs_group_df.iterrows():
                 project = row['project']
                 run_id = row['run_id']
+                input_copy_dir = MAIN_OUTPUT_DIR + project + "/" + run_id + "/"
+                output_copy_dir = MAIN_COPY_PARSED_DIR + project + "/" + run_id + "/"
+                api_logger.info('Start: backup copy - from: '+input_copy_dir+', to: '+output_copy_dir)
+                move(input_copy_dir, output_copy_dir)
+                api_logger.info('End: backup copy')
+            return(dirs_group_df)
+        except Exception as err:
+            raise RuntimeError("** Error: move_parsing_backup Failed (" + str(err) + ")")
+
+    def move_staging_backup(self):
+        """
+         move data out of staging folder and to backup folder; must happen after parsing is complete
+        """
+        try:
+            dirs_group_df = self.move_parsing_backup()
+            MAIN_INPUT_DIR = self.MAIN_INPUT_DIR
+            MAIN_COPY_ORIGINAL_DIR = self.MAIN_COPY_ORIGINAL_DIR
+            #dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
+            # print(dirs_group_df)
+
+            for index, row in dirs_group_df.iterrows():
+                project = row['project']
+                run_id = row['run_id']
                 input_copy_dir = MAIN_INPUT_DIR + project + "/" + run_id + "/"
-                output_copy_dir = MAIN_COPY_DIR + project + "/" + run_id + "/"
+                output_copy_dir = MAIN_COPY_ORIGINAL_DIR + project + "/" + run_id + "/"
                 api_logger.info('Start: backup copy - from: '+input_copy_dir+', to: '+output_copy_dir)
                 move(input_copy_dir, output_copy_dir)
                 api_logger.info('End: backup copy')
@@ -449,19 +502,19 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: move_staging_backup Failed (" + str(err) + ")")
 
-    def complete_copy_upload(self):
+    def complete_move_upload(self):
         """
-         Create MYTDComplete.txt files
+         Create MYTDComplete.txt files in parsed and original folders in backup directory
         """
         try:
             dirs_group_df = self.move_staging_backup()
-            MAIN_OUTPUT_DIR = self.MAIN_OUTPUT_DIR
-            MAIN_COPY_DIR = self.MAIN_COPY_DIR
+            MAIN_COPY_PARSED_DIR = self.MAIN_COPY_PARSED_DIR
+            MAIN_COPY_ORIGINAL_DIR = self.MAIN_COPY_ORIGINAL_DIR
             for index, row in dirs_group_df.iterrows():
                 project = row['project']
                 run_id = row['run_id']
-                output_parse_dir = MAIN_OUTPUT_DIR + project + "/" + run_id + "/"
-                output_copy_dir = MAIN_COPY_DIR + project + "/" + run_id + "/"
+                output_parse_dir = MAIN_COPY_PARSED_DIR + project + "/" + run_id + "/"
+                output_copy_dir = MAIN_COPY_ORIGINAL_DIR + project + "/" + run_id + "/"
                 complete_filepath = output_parse_dir+"MYTDComplete.txt"
                 with open(complete_filepath, mode='a') as file:
                     file.write('[START] mytd_parser completed at [%s] \n for %s \n Backup copied to %s [END]\n' %
@@ -469,6 +522,10 @@ class MiSeqParser:
                 copy2(complete_filepath, output_copy_dir)
         except Exception as err:
             raise RuntimeError("** Error: complete_copy_upload Failed (" + str(err) + ")")
+
+
+
+
 
 # not using below subprocess calls
 
