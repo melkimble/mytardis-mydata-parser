@@ -116,6 +116,7 @@ dmypy.json
 
 #pycharm
 .idea/vcs.xml
+.idea/*
 
 # NGS Data
 /NGS_Outputs/*
