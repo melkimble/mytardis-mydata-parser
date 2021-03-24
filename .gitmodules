@@ -1,0 +1,3 @@
+[submodule "mydata-python"]
+	path = mydata-python
+	url = https://github.com/mytardis/mydata-python.git
