@@ -13,6 +13,7 @@ from pathlib import *
 from distutils.dir_util import copy_tree
 from subprocess import PIPE, run
 import datetime
+from datetime import datetime
 import pathlib
 
 def unique(list1):
@@ -29,6 +30,7 @@ class MiSeqParser:
         self.MAIN_COPY_ORIGINAL_DIR = settings.MAIN_COPY_ORIGINAL_DIR
         self.MAIN_COPY_PARSED_DIR = settings.MAIN_COPY_PARSED_DIR
         self.MAIN_OUTPUT_DIR = settings.MAIN_OUTPUT_DIR
+        self.LOG_FILE_DIR = settings.LOG_FILE_DIR
         # mydata cfgs
         self.DATA_DIRECTORY = settings.DATA_DIRECTORY
         self.FOLDER_STRUCTURE = settings.FOLDER_STRUCTURE
@@ -40,7 +42,7 @@ class MiSeqParser:
         """
         try:
             #input_run_dir = MAIN_INPUT_DIR + project + "/" + run_id + "/"
-            api_logger.info('Start: checking RTAComplete.txt ' + str(input_run_dir))
+            api_logger.info('Start: checking RTAComplete.txt [' + str(input_run_dir)+']')
             rta_file = pathlib.Path(input_run_dir+"RTAComplete.txt")
             if rta_file.exists():
                 api_logger.info('End: RTAComplete.txt exists')
@@ -64,6 +66,7 @@ class MiSeqParser:
             projects = []
             num_align_subdirs = []
             rta_completes = []
+            num_run_dirs = []
             project_dirs = glob.glob(os.path.join(self.MAIN_INPUT_DIR, '*/'))
 
             for project_dir in project_dirs:
@@ -73,57 +76,62 @@ class MiSeqParser:
                     continue
                 project = Path(project_dir).name
                 # grab sequencing folder directory with most recent date for each project
-                run_dir = max(glob.glob(os.path.join(project_dir, '*/')), key=os.path.getmtime)
-                run_dir = run_dir.replace('\\', '/')
-
-                if self.check_rta_complete(run_dir):
-                    rta_complete = True
-                else:
-                    rta_complete = False
-
-                # grab run_id from path name
-                run_id = Path(run_dir).name
-
-                alignment_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
-                # convert forward slashes to backwards slashes
-                alignment_dirs_list = [dir_path.replace('\\', '/') for dir_path in alignment_dirs_list]
-                # grab filepath with "Alignment" in it
-                alignment_dir = [algndir for algndir in alignment_dirs_list if "Alignment" in algndir]
-                # convert list to string
-                alignment_dir = ''.join(alignment_dir)
-
-                align_subdirs_list = glob.glob(os.path.join(alignment_dir, '*/'))
-                # convert forward slashes to backwards slashes
-                align_subdirs_list = [dir_path.replace('\\', '/') for dir_path in align_subdirs_list]
-                for align_subdir in align_subdirs_list:
-                    num_align_subdir = len(align_subdirs_list)
-                    fastq_dirs_list = glob.glob(os.path.join(align_subdir, '*/'))
+                #run_dir = max(glob.glob(os.path.join(project_dir, '*/')), key=os.path.getmtime)
+                #run_dir = run_dir.replace('\\', '/')
+                # change to all sequencing folders in directory
+                run_dir_list = glob.glob(os.path.join(project_dir, '*/'))
+                run_dir_list = [dir_path.replace('\\', '/') for dir_path in run_dir_list]
+                for run_dir in run_dir_list:
+                    # the number of sequencing runs per project
+                    num_run_dir = len(run_dir_list)
+                    # if rta_complete exists, sets variable to True to be filtered on
+                    # to only process rta_complete directories
+                    rta_complete = self.check_rta_complete(run_dir)
+                    # grab run_id from path name
+                    run_id = Path(run_dir).name
+                    alignment_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
                     # convert forward slashes to backwards slashes
-                    fastq_dirs_list = [dir_path.replace('\\', '/') for dir_path in fastq_dirs_list]
-                    # grab filepath with "Fastq" in it
-                    fastq_dir = [fqdir for fqdir in fastq_dirs_list if "Fastq" in fqdir]
+                    alignment_dirs_list = [dir_path.replace('\\', '/') for dir_path in alignment_dirs_list]
+                    # grab filepath with "Alignment" in it
+                    alignment_dir = [algndir for algndir in alignment_dirs_list if "Alignment" in algndir]
                     # convert list to string
-                    fastq_dir = ''.join(fastq_dir)
-                    # grab all other dirs and leave as list
-                    # other_dirs = [fqdir for fqdir in fastq_dirs_list if not "Fastq" in fqdir]
+                    alignment_dir = ''.join(alignment_dir)
 
-                    # append to lists
-                    projects.append(project)
-                    run_dirs.append(run_dir)
-                    run_ids.append(run_id)
-                    align_subdirs.append(align_subdir)
-                    fastq_dirs.append(fastq_dir)
-                    num_align_subdirs.append(num_align_subdir)
-                    rta_completes.append(rta_complete)
-            dirs_df = pd.DataFrame(list(zip(projects, run_dirs, run_ids, align_subdirs, fastq_dirs, num_align_subdirs,rta_completes)),
-                                   columns=['project', 'run_dir', 'run_id', 'align_subdir', 'fastq_dir', 'num_align_subdir','rta_complete'])
+                    align_subdirs_list = glob.glob(os.path.join(alignment_dir, '*/'))
+                    # convert forward slashes to backwards slashes
+                    align_subdirs_list = [dir_path.replace('\\', '/') for dir_path in align_subdirs_list]
+                    for align_subdir in align_subdirs_list:
+                        num_align_subdir = len(align_subdirs_list)
+                        fastq_dirs_list = glob.glob(os.path.join(align_subdir, '*/'))
+                        # convert forward slashes to backwards slashes
+                        fastq_dirs_list = [dir_path.replace('\\', '/') for dir_path in fastq_dirs_list]
+                        # grab filepath with "Fastq" in it
+                        fastq_dir = [fqdir for fqdir in fastq_dirs_list if "Fastq" in fqdir]
+                        # convert list to string
+                        fastq_dir = ''.join(fastq_dir)
+                        # grab all other dirs and leave as list
+                        # other_dirs = [fqdir for fqdir in fastq_dirs_list if not "Fastq" in fqdir]
+
+                        # append to lists
+                        projects.append(project)
+                        run_dirs.append(run_dir)
+                        run_ids.append(run_id)
+                        align_subdirs.append(align_subdir)
+                        fastq_dirs.append(fastq_dir)
+                        num_run_dirs.append(num_run_dir)
+                        num_align_subdirs.append(num_align_subdir)
+                        rta_completes.append(rta_complete)
+            dirs_df = pd.DataFrame(list(zip(projects, run_dirs, run_ids, align_subdirs, fastq_dirs, num_run_dirs,
+                                            num_align_subdirs,rta_completes)),
+                                   columns=['project', 'run_dir', 'run_id', 'align_subdir', 'fastq_dir', 'num_run_dir',
+                                            'num_align_subdir','rta_complete'])
             # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
             dirs_df_rta_complete = dirs_df[dirs_df["rta_complete"] == True]
             return(dirs_df_rta_complete)
         except Exception as err:
             raise RuntimeError("** Error: get_dirs Failed (" + str(err) + ")")
 
-    def copy_metadata_dirs(self):
+    def copy_metadata_dirs(self,ignore_dirs):
         """
          copy metadata dirs and files
         """
@@ -146,7 +154,7 @@ class MiSeqParser:
                 align_subdir = row['align_subdir']
                 fastq_dir = row['fastq_dir']
                 # log info
-                api_logger.info('Starting: '+project+', '+run_id+', '+run_dir+', '+align_subdir+', '+fastq_dir+', '+str(num_align_subdir))
+                api_logger.info('copy_metadata_dirs: '+project+', '+run_id+', ['+run_dir+', '+align_subdir+', '+fastq_dir+'], '+str(num_align_subdir))
 
                 output_metadata_dir = MAIN_OUTPUT_DIR + project + "/" + run_id + "/run_metadata_"+run_id+"/"
                 # if directory doesn't exist, create it
@@ -155,10 +163,15 @@ class MiSeqParser:
 
                 run_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
                 run_dirs_list = [dir_path.replace('\\', '/') for dir_path in run_dirs_list]
-
-                # copy files to run_metadata folder
-                # Alignment is here because it will be treated differently
-                ignore_list = ["Alignment", "Data", "Thumbnail_Images"]
+                if ignore_dirs:
+                    # if ignore_dirs = True, do not copy any folders to Upload
+                    ignore_list = run_dirs_list
+                    api_logger.info('Ignore Dirs: ' + str(ignore_list))
+                else:
+                    # copy files to run_metadata folder
+                    # Alignment is here because it will be treated differently
+                    ignore_list = ["Alignment", "Data", "Thumbnail_Images"]
+                    api_logger.info('Ignore Dirs: ' + str(ignore_list))
                 # directories in run folder to keep and move to run_metadata folder
                 keep_dirs_list = [rundir for rundir in run_dirs_list if not any(ignore in rundir for ignore in ignore_list)]
                 api_logger.info('Keep Dirs: '+str(keep_dirs_list))
@@ -178,14 +191,16 @@ class MiSeqParser:
                     file_count+=1
                     # log info
                 api_logger.info('End copied ' + str(file_count) + ' files')
-                api_logger.info('Start copying ' + str(num_dirs) + ' dirs')
-                dir_count=0
-                for keep_dir in keep_dirs_list:
-                    dir_name = Path(keep_dir).name
-                    copy_tree(keep_dir,output_metadata_dir+dir_name+'/')
-                    dir_count+=1
-                # log info
-                api_logger.info('End copying ' + str(dir_count) + ' dirs')
+                if num_dirs > 0:
+                    # if there are directories in list, copy them. Otherwise do nothing.
+                    api_logger.info('Start copying ' + str(num_dirs) + ' dirs')
+                    dir_count=0
+                    for keep_dir in keep_dirs_list:
+                        dir_name = Path(keep_dir).name
+                        copy_tree(keep_dir,output_metadata_dir+dir_name+'/')
+                        dir_count+=1
+                    # log info
+                    api_logger.info('End copied ' + str(dir_count) + ' dirs')
                 if num_align_subdir > 1:
                     # if more than 1 align_subdir, add 1 to counter
                     align_counter+=1
@@ -198,7 +213,7 @@ class MiSeqParser:
          parse fastq metadata dirs
         """
         try:
-            dirs_df = self.copy_metadata_dirs()
+            dirs_df = self.copy_metadata_dirs(ignore_dirs=True)
             MAIN_OUTPUT_DIR = self.MAIN_OUTPUT_DIR
             for index, row in dirs_df.iterrows():
                 num_align_subdir = row['num_align_subdir']
@@ -207,7 +222,7 @@ class MiSeqParser:
                 align_subdir = row['align_subdir']
                 fastq_dir = row['fastq_dir']
                 # log info
-                api_logger.info('Starting: '+project+', '+run_id+', '+align_subdir+', '+fastq_dir+', '+str(num_align_subdir))
+                api_logger.info('parse_fastq_metadata_dirs: '+project+', '+run_id+', ['+align_subdir+', '+fastq_dir+'], '+str(num_align_subdir))
 
                 output_metadata_dir = MAIN_OUTPUT_DIR + project + "/" + run_id + "/run_metadata_" + run_id + "/"
                 align_subdir_list = glob.glob(os.path.join(align_subdir, '*/'))
@@ -218,7 +233,7 @@ class MiSeqParser:
                 # directories in run folder to keep and move to run_metadata folder
                 keep_dirs_list = [subdir for subdir in align_subdir_list if not any(ignore in subdir for ignore in ignore_list)]
                 # log info
-                api_logger.info('Keep fastq metadata dirs: '+str(keep_dirs_list))
+                api_logger.info('Keep Dirs: '+str(keep_dirs_list))
                 num_dirs = len(keep_dirs_list)
 
                 align_subdir_files_list = glob.glob(os.path.join(align_subdir, '*'))
@@ -230,7 +245,7 @@ class MiSeqParser:
                 # files in run folder to move to run_metadata folder
 
                 # log info
-                api_logger.info('Start fastq metadata copying ' + str(num_files) + ' files')
+                api_logger.info('Start copying ' + str(num_files) + ' files')
                 align_subdir_name = Path(align_subdir).name
                 output_fastq_metadata_dir = output_metadata_dir + 'Fastq_' + align_subdir_name + '/'
                 if not os.path.exists(output_fastq_metadata_dir):
@@ -240,8 +255,8 @@ class MiSeqParser:
                     copy2(file, output_fastq_metadata_dir)
                     file_count+=1
                 # log info
-                api_logger.info('End fastq metadata copied ' + str(file_count) + ' files')
-                api_logger.info('Start fastq metadata copying ' + str(num_dirs) + ' dirs')
+                api_logger.info('End copied ' + str(file_count) + ' files')
+                api_logger.info('Start copying ' + str(num_dirs) + ' dirs')
                 dir_count=0
                 for keep_dir in keep_dirs_list:
                     dir_name = Path(keep_dir).name
@@ -251,7 +266,7 @@ class MiSeqParser:
                     copy_tree(keep_dir,output_fastq_metadata_subdir)
                     dir_count+=1
                 # log info
-                api_logger.info('End fastq metadata copying ' + str(dir_count) + ' dirs')
+                api_logger.info('End copied ' + str(dir_count) + ' dirs')
             return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: parse_fastq_metadata_dirs Failed (" + str(err) + ")")
@@ -263,7 +278,6 @@ class MiSeqParser:
         try:
             dirs_df = self.parse_fastq_metadata_dirs()
             MAIN_OUTPUT_DIR = self.MAIN_OUTPUT_DIR
-
             for index, row in dirs_df.iterrows():
                 num_align_subdir = row['num_align_subdir']
                 project = row['project']
@@ -271,14 +285,13 @@ class MiSeqParser:
                 align_subdir = row['align_subdir']
                 fastq_dir = row['fastq_dir']
                 # log info
-                api_logger.info('Starting: '+project+', '+run_id+', '+align_subdir+', '+fastq_dir+', '+str(num_align_subdir))
-
+                print("HERE "+fastq_dir)
+                api_logger.info('parse_fastq_files: '+project+', '+run_id+', ['+align_subdir+', '+fastq_dir+'], Num Subalign: '+str(num_align_subdir))
+                # grab name of Alignment subdir, e.g., "20201224_205858"
                 align_subdir_name = Path(align_subdir).name
 
                 output_run_dir = MAIN_OUTPUT_DIR + project + "/" + run_id + "/"
                 output_fastq_dir = output_run_dir + "Fastq_"+align_subdir_name + "/"
-
-
 
                 fastq_files_list = glob.glob(os.path.join(fastq_dir, '*.fastq.gz'))
                 fastq_files_list = [dir_path.replace('\\', '/') for dir_path in fastq_files_list]
@@ -290,8 +303,7 @@ class MiSeqParser:
                 # files in run folder to move to run_metadata folder
 
                 # log info
-                api_logger.info('Start fastq copying ' + str(num_files) + ' files')
-                subdir_name = Path(align_subdir).name
+                api_logger.info('Start copying ' + str(num_files) + ' files')
 
                 sample_ids = []
                 for fastq_file in fastq_files_list:
@@ -301,6 +313,8 @@ class MiSeqParser:
                     sample_id = fastq_name.split('_', 1)[0]
                     sample_ids.append(sample_id)
                 fastq_df = pd.DataFrame(list(zip(sample_ids, fastq_files_list)), columns=['sample_id', 'fastq_path'])
+                output_csv_filename = datetime.now().strftime(self.LOG_FILE_DIR+'Fastq_'+align_subdir_name+'_filelist_%Y%m%d.csv')
+                fastq_df.to_csv(output_csv_filename, encoding='utf-8')
                 # unique subset of sample_ids sorted by name
 
                 sample_ids = sorted(unique(sample_ids))
@@ -319,10 +333,108 @@ class MiSeqParser:
                     # copy summary file into each fastq sample_id folder
                     copy2(summary_file, output_fastq_dir)
                 # log info
-                api_logger.info('End fastq copied ' + str(file_count) + ' files')
-                return(dirs_df)
+                api_logger.info('End copied ' + str(file_count) + ' files')
+            # output processed dirs to csv
+            output_csv_filename = datetime.now().strftime(self.LOG_FILE_DIR + 'dirlist_%Y%m%d.csv')
+            dirs_df.to_csv(output_csv_filename, encoding='utf-8')
+            return(dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: parse_fastq_files Failed (" + str(err) + ")")
+
+    def move_parsing_backup(self):
+        """
+         move parsed files from upload to backup; must happen after mydata upload is complete
+        """
+        try:
+            dirs_df = self.get_dirs()
+            MAIN_OUTPUT_DIR = self.MAIN_OUTPUT_DIR
+            MAIN_COPY_PARSED_DIR = self.MAIN_COPY_PARSED_DIR
+            dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
+            # print(dirs_group_df)
+
+            for index, row in dirs_group_df.iterrows():
+                project = row['project']
+                run_id = row['run_id']
+                api_logger.info('move_parsing_backup: '+project+', '+run_id)
+                input_copy_dir = MAIN_OUTPUT_DIR + project + "/" + run_id + "/"
+                output_copy_dir = MAIN_COPY_PARSED_DIR + project + "/" + run_id + "/"
+                api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_copy_dir+']')
+                move(input_copy_dir, output_copy_dir)
+                api_logger.info('End: parse backup moved')
+            return(dirs_group_df)
+        except Exception as err:
+            raise RuntimeError("** Error: move_parsing_backup Failed (" + str(err) + ")")
+
+    def move_staging_backup(self):
+        """
+         move data out of staging folder and to backup folder; must happen after parsing is complete
+        """
+        try:
+            dirs_df = self.get_dirs()
+            MAIN_INPUT_DIR = self.MAIN_INPUT_DIR
+            MAIN_COPY_ORIGINAL_DIR = self.MAIN_COPY_ORIGINAL_DIR
+            dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
+
+            for index, row in dirs_group_df.iterrows():
+                project = row['project']
+                run_id = row['run_id']
+                api_logger.info('move_staging_backup: '+project+', '+run_id)
+                input_copy_dir = MAIN_INPUT_DIR + project + "/" + run_id + "/"
+                output_copy_dir = MAIN_COPY_ORIGINAL_DIR + project + "/" + run_id + "/"
+                api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_copy_dir+']')
+                move(input_copy_dir, output_copy_dir)
+                api_logger.info('End: original backup moved')
+            return(dirs_group_df)
+        except Exception as err:
+            raise RuntimeError("** Error: move_staging_backup Failed (" + str(err) + ")")
+
+    def complete_backup(self, move_parsing, move_staging):
+        """
+         Create MYTDComplete.txt files in parsed and original folders in backup directory
+        """
+        try:
+            dirs_df = self.get_dirs()
+            MAIN_COPY_PARSED_DIR = self.MAIN_COPY_PARSED_DIR
+            MAIN_COPY_ORIGINAL_DIR = self.MAIN_COPY_ORIGINAL_DIR
+            dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
+            for index, row in dirs_group_df.iterrows():
+                project = row['project']
+                run_id = row['run_id']
+                api_logger.info('complete_backup: '+project+', '+run_id)
+
+                output_parse_dir = MAIN_COPY_PARSED_DIR + project + "/" + run_id + "/"
+                output_copy_dir = MAIN_COPY_ORIGINAL_DIR + project + "/" + run_id + "/"
+
+                if move_parsing and move_staging:
+                    self.move_parsing_backup()
+                    self.move_staging_backup()
+                    complete_filepath = output_parse_dir + "MYTDComplete.txt"
+                    with open(complete_filepath, mode='a') as file:
+                        file.write('[START]\n mytd_parser completed at [%s]\n Project: %s\n RunID: %s\n Original backup copied: [%s]\n Parsed backup copied: [%s]\n[END]' %
+                                   (datetime.now(), project,run_id, output_copy_dir,output_parse_dir))
+                    copy2(complete_filepath, output_copy_dir)
+                    api_logger.info('Backup Parsed and Original: '+project +', '+run_id+', ['+output_copy_dir+', '+output_parse_dir+']')
+                elif move_parsing and not move_staging:
+                    self.move_parsing_backup()
+                    complete_filepath = output_parse_dir + "MYTDComplete.txt"
+                    with open(complete_filepath, mode='a') as file:
+                        file.write('[START]\n mytd_parser completed at [%s]\n Project: %s\n RunID: %s\n Original backup copied: [%s]\n[END]' %
+                                   (datetime.now(), project,run_id, output_parse_dir))
+                    api_logger.info('Backup Parsed: ' + project + ', ' + run_id + ', [' + output_parse_dir+']')
+                elif not move_parsing and move_staging:
+                    self.move_staging_backup()
+                    complete_filepath = output_copy_dir + "MYTDComplete.txt"
+                    with open(complete_filepath, mode='a') as file:
+                        file.write('[START]\n mytd_parser completed at [%s]\n Project: %s\n RunID: %s\n Original backup copied: [%s]\n[END]' %
+                                   (datetime.now(), project,run_id, output_copy_dir))
+                    api_logger.info('Backup Original: ' + project + ', ' + run_id+', [' + output_copy_dir+']')
+                elif not move_parsing and not move_staging:
+                    api_logger.info('No backup created: ' + project + ', ' + run_id)
+
+        except Exception as err:
+            raise RuntimeError("** Error: complete_copy_upload Failed (" + str(err) + ")")
+
+## Skip below until mydata-python working - issue submitted on GitHub
 
     def set_mydata_settings_subprocess(self):
         """
@@ -455,77 +567,3 @@ class MiSeqParser:
             return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: upload_mydata_py Failed (" + str(err) + ")")
-
-    def move_parsing_backup(self):
-        """
-         move parsed files from upload to backup; must happen after mydata upload is complete
-        """
-        try:
-            dirs_df = self.scan_mydata_py()
-            MAIN_OUTPUT_DIR = self.MAIN_OUTPUT_DIR
-            MAIN_COPY_PARSED_DIR = self.MAIN_COPY_PARSED_DIR
-            dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
-            # print(dirs_group_df)
-
-            for index, row in dirs_group_df.iterrows():
-                project = row['project']
-                run_id = row['run_id']
-                input_copy_dir = MAIN_OUTPUT_DIR + project + "/" + run_id + "/"
-                output_copy_dir = MAIN_COPY_PARSED_DIR + project + "/" + run_id + "/"
-                api_logger.info('Start: backup copy - from: '+input_copy_dir+', to: '+output_copy_dir)
-                move(input_copy_dir, output_copy_dir)
-                api_logger.info('End: backup copy')
-            return(dirs_group_df)
-        except Exception as err:
-            raise RuntimeError("** Error: move_parsing_backup Failed (" + str(err) + ")")
-
-    def move_staging_backup(self):
-        """
-         move data out of staging folder and to backup folder; must happen after parsing is complete
-        """
-        try:
-            dirs_group_df = self.move_parsing_backup()
-            MAIN_INPUT_DIR = self.MAIN_INPUT_DIR
-            MAIN_COPY_ORIGINAL_DIR = self.MAIN_COPY_ORIGINAL_DIR
-            #dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
-            # print(dirs_group_df)
-
-            for index, row in dirs_group_df.iterrows():
-                project = row['project']
-                run_id = row['run_id']
-                input_copy_dir = MAIN_INPUT_DIR + project + "/" + run_id + "/"
-                output_copy_dir = MAIN_COPY_ORIGINAL_DIR + project + "/" + run_id + "/"
-                api_logger.info('Start: backup copy - from: '+input_copy_dir+', to: '+output_copy_dir)
-                move(input_copy_dir, output_copy_dir)
-                api_logger.info('End: backup copy')
-            return(dirs_group_df)
-        except Exception as err:
-            raise RuntimeError("** Error: move_staging_backup Failed (" + str(err) + ")")
-
-    def complete_move_upload(self):
-        """
-         Create MYTDComplete.txt files in parsed and original folders in backup directory
-        """
-        try:
-            dirs_group_df = self.move_staging_backup()
-            MAIN_COPY_PARSED_DIR = self.MAIN_COPY_PARSED_DIR
-            MAIN_COPY_ORIGINAL_DIR = self.MAIN_COPY_ORIGINAL_DIR
-            for index, row in dirs_group_df.iterrows():
-                project = row['project']
-                run_id = row['run_id']
-                output_parse_dir = MAIN_COPY_PARSED_DIR + project + "/" + run_id + "/"
-                output_copy_dir = MAIN_COPY_ORIGINAL_DIR + project + "/" + run_id + "/"
-                complete_filepath = output_parse_dir+"MYTDComplete.txt"
-                with open(complete_filepath, mode='a') as file:
-                    file.write('[START] mytd_parser completed at [%s] \n for %s \n Backup copied to %s [END]\n' %
-                               (datetime.datetime.now(), output_parse_dir, output_copy_dir))
-                copy2(complete_filepath, output_copy_dir)
-        except Exception as err:
-            raise RuntimeError("** Error: complete_copy_upload Failed (" + str(err) + ")")
-
-
-
-
-
-# not using below subprocess calls
-

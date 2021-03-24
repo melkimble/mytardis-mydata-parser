@@ -15,7 +15,6 @@ MAIN_OUTPUT_DIR = BASE_DIR+"/NGS_Outputs/Upload/"
 MAIN_COPY_ORIGINAL_DIR = MAIN_COPY_DIR + "Original/"
 MAIN_COPY_PARSED_DIR = MAIN_COPY_DIR + "Parsed/"
 
-
 # error logging
 LOG_FILE_DIR = BASE_DIR+'/logs/'
 
