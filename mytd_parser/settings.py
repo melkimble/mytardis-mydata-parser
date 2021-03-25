@@ -26,7 +26,7 @@ FOLDER_STRUCTURE = 'User Group / Dataset'
 MYTARDIS_URL = 'https://mytardis.maine-edna.org'
 
 # parse_server_copy.py settings
-SERVER_INPUT_DIR = "/UMaine2/mytardis/mydata_storage/receiving/"
+SERVER_INPUT_DIR = "/UMaine2/mytardis/CORE/"
 SERVER_OUTPUT_DIR = "/UMaine2/Maine_eDNA/"
 SERVER_OUTPUT_HPC_DIR = "/UMaine2/HPC_Results/"
 
