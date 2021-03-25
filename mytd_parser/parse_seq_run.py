@@ -1,7 +1,8 @@
 """
-ngs_parse_run.py
+parse_seq_run.py
 Filter and parse MiSeq Illumina runs and submit data via MyData to MyTardis
 Created By: mkimble
+LAST MODIFIED: 03/24/2021
 """
 
 from . import settings
@@ -24,33 +25,45 @@ def unique(list1):
     return(unique_list)
 
 class MiSeqParser:
-    def __init__(self):
-        self.MAIN_INPUT_DIR = settings.MAIN_INPUT_DIR
-        #self.MAIN_COPY_DIR = settings.MAIN_COPY_DIR
-        self.MAIN_COPY_ORIGINAL_DIR = settings.MAIN_COPY_ORIGINAL_DIR
-        self.MAIN_COPY_PARSED_DIR = settings.MAIN_COPY_PARSED_DIR
-        self.MAIN_OUTPUT_DIR = settings.MAIN_OUTPUT_DIR
-        self.LOG_FILE_DIR = settings.LOG_FILE_DIR
+    def __init__(self, input_dir=settings.MISEQ_INPUT_DIR,
+                 copy_original_dir=settings.MISEQ_COPY_ORIGINAL_DIR,
+                 copy_parsed_dir=settings.MISEQ_COPY_PARSED_DIR,
+                 output_dir=settings.MISEQ_OUTPUT_DIR,
+                 log_file_dir=settings.LOG_FILE_DIR,
+                 data_directory=settings.MISEQ_DATA_DIRECTORY,
+                 folder_structure=settings.FOLDER_STRUCTURE,
+                 mytardis_url=settings.MYTARDIS_URL):
+        self.input_dir = input_dir
+        #self.MISEQ_COPY_DIR = settings.MISEQ_COPY_DIR
+        self.copy_original_dir = copy_original_dir
+        self.copy_parsed_dir = copy_parsed_dir
+        self.output_dir = output_dir
+        self.log_file_dir = log_file_dir
         # mydata cfgs
-        self.DATA_DIRECTORY = settings.DATA_DIRECTORY
-        self.FOLDER_STRUCTURE = settings.FOLDER_STRUCTURE
-        self.MYTARDIS_URL = settings.MYTARDIS_URL
+        self.data_directory = data_directory
+        self.folder_structure = folder_structure
+        self.mytardis_url = mytardis_url
 
     def check_rta_complete(self, input_run_dir):
         """
          check to see if RTAComplete.txt exists
         """
         try:
-            #input_run_dir = MAIN_INPUT_DIR + project + "/" + run_id + "/"
-            api_logger.info('Start: checking RTAComplete.txt [' + str(input_run_dir)+']')
-            rta_file = pathlib.Path(input_run_dir+"RTAComplete.txt")
-            if rta_file.exists():
+            #input_run_dir = input_dir + project + "/" + run_id + "/"
+            api_logger.info('check_rta_complete: [' + str(input_run_dir)+']')
+            rta_file_name = 'RTAComplete.txt'
+            rta_file_name = glob.glob(f'{input_run_dir}/**/{rta_file_name}', recursive=True)
+            if rta_file_name:
+                print(rta_file_name)
                 api_logger.info('End: RTAComplete.txt exists')
-                return(True)
+                return True
             else:
-                # if RTAComplete.txt does not exist, then we do not want to proceed with processing the code.
+                print(rta_file_name)
+                # if RTAComplete.txt does not exist, then we do not want to proceed with processing
+                # the sequencing run.
                 api_logger.info('End: RTAComplete.txt does not exist - sequencing run not complete')
-                return(False)
+                return False
+
         except Exception as err:
             raise RuntimeError("** Error: check_rta_complete Failed (" + str(err) + ")")
 
@@ -67,7 +80,7 @@ class MiSeqParser:
             num_align_subdirs = []
             rta_completes = []
             num_run_dirs = []
-            project_dirs = glob.glob(os.path.join(self.MAIN_INPUT_DIR, '*/'))
+            project_dirs = glob.glob(os.path.join(self.input_dir, '*/'))
 
             for project_dir in project_dirs:
                 dir_length = len(os.listdir(project_dir))
@@ -125,6 +138,10 @@ class MiSeqParser:
                                             num_align_subdirs,rta_completes)),
                                    columns=['project', 'run_dir', 'run_id', 'align_subdir', 'fastq_dir', 'num_run_dir',
                                             'num_align_subdir','rta_complete'])
+
+            # output dirs to csv
+            output_csv_filename = datetime.now().strftime(self.log_file_dir + 'dirlist_%Y%m%d_%H%M%S.csv')
+            dirs_df.to_csv(output_csv_filename, encoding='utf-8')
             # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
             dirs_df_rta_complete = dirs_df[dirs_df["rta_complete"] == True]
             return(dirs_df_rta_complete)
@@ -137,7 +154,7 @@ class MiSeqParser:
         """
         try:
             dirs_df = self.get_dirs()
-            MAIN_OUTPUT_DIR = self.MAIN_OUTPUT_DIR
+            output_dir = self.output_dir
             align_counter = 1
             for index, row in dirs_df.iterrows():
                 num_align_subdir = row['num_align_subdir']
@@ -156,7 +173,7 @@ class MiSeqParser:
                 # log info
                 api_logger.info('copy_metadata_dirs: '+project+', '+run_id+', ['+run_dir+', '+align_subdir+', '+fastq_dir+'], '+str(num_align_subdir))
 
-                output_metadata_dir = MAIN_OUTPUT_DIR + project + "/" + run_id + "/run_metadata_"+run_id+"/"
+                output_metadata_dir = output_dir + project + "/" + run_id + "/run_metadata_"+run_id+"/"
                 # if directory doesn't exist, create it
                 if not os.path.exists(output_metadata_dir):
                     os.makedirs(output_metadata_dir)
@@ -214,7 +231,7 @@ class MiSeqParser:
         """
         try:
             dirs_df = self.copy_metadata_dirs(ignore_dirs=True)
-            MAIN_OUTPUT_DIR = self.MAIN_OUTPUT_DIR
+            output_dir = self.output_dir
             for index, row in dirs_df.iterrows():
                 num_align_subdir = row['num_align_subdir']
                 project = row['project']
@@ -224,7 +241,7 @@ class MiSeqParser:
                 # log info
                 api_logger.info('parse_fastq_metadata_dirs: '+project+', '+run_id+', ['+align_subdir+', '+fastq_dir+'], '+str(num_align_subdir))
 
-                output_metadata_dir = MAIN_OUTPUT_DIR + project + "/" + run_id + "/run_metadata_" + run_id + "/"
+                output_metadata_dir = output_dir + project + "/" + run_id + "/run_metadata_" + run_id + "/"
                 align_subdir_list = glob.glob(os.path.join(align_subdir, '*/'))
                 align_subdir_list = [dir_path.replace('\\', '/') for dir_path in align_subdir_list]
                 # copy files to run_metadata folder
@@ -277,7 +294,7 @@ class MiSeqParser:
         """
         try:
             dirs_df = self.parse_fastq_metadata_dirs()
-            MAIN_OUTPUT_DIR = self.MAIN_OUTPUT_DIR
+            output_dir = self.output_dir
             for index, row in dirs_df.iterrows():
                 num_align_subdir = row['num_align_subdir']
                 project = row['project']
@@ -285,12 +302,11 @@ class MiSeqParser:
                 align_subdir = row['align_subdir']
                 fastq_dir = row['fastq_dir']
                 # log info
-                print("HERE "+fastq_dir)
                 api_logger.info('parse_fastq_files: '+project+', '+run_id+', ['+align_subdir+', '+fastq_dir+'], Num Subalign: '+str(num_align_subdir))
                 # grab name of Alignment subdir, e.g., "20201224_205858"
                 align_subdir_name = Path(align_subdir).name
 
-                output_run_dir = MAIN_OUTPUT_DIR + project + "/" + run_id + "/"
+                output_run_dir = output_dir + project + "/" + run_id + "/"
                 output_fastq_dir = output_run_dir + "Fastq_"+align_subdir_name + "/"
 
                 fastq_files_list = glob.glob(os.path.join(fastq_dir, '*.fastq.gz'))
@@ -313,7 +329,7 @@ class MiSeqParser:
                     sample_id = fastq_name.split('_', 1)[0]
                     sample_ids.append(sample_id)
                 fastq_df = pd.DataFrame(list(zip(sample_ids, fastq_files_list)), columns=['sample_id', 'fastq_path'])
-                output_csv_filename = datetime.now().strftime(self.LOG_FILE_DIR+'Fastq_'+align_subdir_name+'_filelist_%Y%m%d.csv')
+                output_csv_filename = datetime.now().strftime(self.log_file_dir+'Fastq_'+align_subdir_name+'_filelist_%Y%m%d_%H%M%S.csv')
                 fastq_df.to_csv(output_csv_filename, encoding='utf-8')
                 # unique subset of sample_ids sorted by name
 
@@ -334,9 +350,6 @@ class MiSeqParser:
                     copy2(summary_file, output_fastq_dir)
                 # log info
                 api_logger.info('End copied ' + str(file_count) + ' files')
-            # output processed dirs to csv
-            output_csv_filename = datetime.now().strftime(self.LOG_FILE_DIR + 'dirlist_%Y%m%d.csv')
-            dirs_df.to_csv(output_csv_filename, encoding='utf-8')
             return(dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: parse_fastq_files Failed (" + str(err) + ")")
@@ -347,8 +360,8 @@ class MiSeqParser:
         """
         try:
             dirs_df = self.get_dirs()
-            MAIN_OUTPUT_DIR = self.MAIN_OUTPUT_DIR
-            MAIN_COPY_PARSED_DIR = self.MAIN_COPY_PARSED_DIR
+            output_dir = self.output_dir
+            copy_parsed_dir = self.copy_parsed_dir
             dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
             # print(dirs_group_df)
 
@@ -356,8 +369,8 @@ class MiSeqParser:
                 project = row['project']
                 run_id = row['run_id']
                 api_logger.info('move_parsing_backup: '+project+', '+run_id)
-                input_copy_dir = MAIN_OUTPUT_DIR + project + "/" + run_id + "/"
-                output_copy_dir = MAIN_COPY_PARSED_DIR + project + "/" + run_id + "/"
+                input_copy_dir = output_dir + project + "/" + run_id + "/"
+                output_copy_dir = copy_parsed_dir + project + "/" + run_id + "/"
                 api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_copy_dir+']')
                 move(input_copy_dir, output_copy_dir)
                 api_logger.info('End: parse backup moved')
@@ -371,16 +384,16 @@ class MiSeqParser:
         """
         try:
             dirs_df = self.get_dirs()
-            MAIN_INPUT_DIR = self.MAIN_INPUT_DIR
-            MAIN_COPY_ORIGINAL_DIR = self.MAIN_COPY_ORIGINAL_DIR
+            input_dir = self.input_dir
+            copy_original_dir = self.copy_original_dir
             dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
 
             for index, row in dirs_group_df.iterrows():
                 project = row['project']
                 run_id = row['run_id']
                 api_logger.info('move_staging_backup: '+project+', '+run_id)
-                input_copy_dir = MAIN_INPUT_DIR + project + "/" + run_id + "/"
-                output_copy_dir = MAIN_COPY_ORIGINAL_DIR + project + "/" + run_id + "/"
+                input_copy_dir = input_dir + project + "/" + run_id + "/"
+                output_copy_dir = copy_original_dir + project + "/" + run_id + "/"
                 api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_copy_dir+']')
                 move(input_copy_dir, output_copy_dir)
                 api_logger.info('End: original backup moved')
@@ -394,16 +407,16 @@ class MiSeqParser:
         """
         try:
             dirs_df = self.get_dirs()
-            MAIN_COPY_PARSED_DIR = self.MAIN_COPY_PARSED_DIR
-            MAIN_COPY_ORIGINAL_DIR = self.MAIN_COPY_ORIGINAL_DIR
+            copy_parsed_dir = self.copy_parsed_dir
+            copy_original_dir = self.copy_original_dir
             dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
             for index, row in dirs_group_df.iterrows():
                 project = row['project']
                 run_id = row['run_id']
                 api_logger.info('complete_backup: '+project+', '+run_id)
 
-                output_parse_dir = MAIN_COPY_PARSED_DIR + project + "/" + run_id + "/"
-                output_copy_dir = MAIN_COPY_ORIGINAL_DIR + project + "/" + run_id + "/"
+                output_parse_dir = copy_parsed_dir + project + "/" + run_id + "/"
+                output_copy_dir = copy_original_dir + project + "/" + run_id + "/"
 
                 if move_parsing and move_staging:
                     self.move_parsing_backup()
@@ -444,19 +457,19 @@ class MiSeqParser:
             dirs_df = self.parse_fastq_files()
             # using subprocess.call method
             api_logger.info('Start: mydata config settings')
-            command = ['mydata', 'config', 'set', 'data_directory', self.DATA_DIRECTORY]
+            command = ['mydata', 'config', 'set', 'data_directory', self.data_directory]
             result_dd = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
             api_logger.info(
                 'subprocess result: ' + str(result_dd.returncode) + ', ' + str(result_dd.stdout) + ', ' + str(
                     result_dd.stderr))
 
-            command = ['mydata', 'config', 'set', 'folder_structure', self.FOLDER_STRUCTURE]
+            command = ['mydata', 'config', 'set', 'folder_structure', self.folder_structure]
             result_fs = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
             api_logger.info(
                 'subprocess result: ' + str(result_fs.returncode) + ', ' + str(result_fs.stdout) + ', ' + str(
                     result_fs.stderr))
 
-            command = ['mydata', 'config', 'set', 'mytardis_url', self.MYTARDIS_URL]
+            command = ['mydata', 'config', 'set', 'mytardis_url', self.mytardis_url]
             result_url = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
             api_logger.info(
                 'subprocess result: ' + str(result_url.returncode) + ', ' + str(result_url.stdout) + ', ' + str(
@@ -514,9 +527,9 @@ class MiSeqParser:
 
             dirs_df = self.parse_fastq_files()
             api_logger.info('Start: set config')
-            if settings.data_directory != self.DATA_DIRECTORY: settings.data_directory = self.DATA_DIRECTORY
-            if settings.folder_structure != self.FOLDER_STRUCTURE: settings.folder_structure = self.FOLDER_STRUCTURE
-            if settings.mytardis_url != self.MYTARDIS_URL: settings.mytardis_url = self.MYTARDIS_URL
+            if settings.data_directory != self.data_directory: settings.data_directory = self.data_directory
+            if settings.folder_structure != self.folder_structure: settings.folder_structure = self.folder_structure
+            if settings.mytardis_url != self.mytardis_url: settings.mytardis_url = self.mytardis_url
             save_settings_to_disk()
             load_settings()
             api_logger.info(
@@ -524,9 +537,9 @@ class MiSeqParser:
                     settings.mytardis_url))
             api_logger.info('End: set config')
             # check if settings were updated
-            # assert settings.data_directory == self.DATA_DIRECTORY
-            # assert settings.folder_structure == self.FOLDER_STRUCTURE
-            # assert settings.mytardis_url == self.MYTARDIS_URL
+            # assert settings.data_directory == self.data_directory
+            # assert settings.folder_structure == self.folder_structure
+            # assert settings.mytardis_url == self.mytardis_url
             return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: set_mydata_settings Failed (" + str(err) + ")")

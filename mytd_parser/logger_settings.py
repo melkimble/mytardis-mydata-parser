@@ -2,6 +2,7 @@
 logger_settings.py
 https://stackoverflow.com/questions/49580313/create-a-log-file
 Created By: Tasneem Haider
+LAST MODIFIED: 03/24/2021
 """
 
 import sys
