@@ -136,7 +136,7 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: get_run_id_xml Failed (" + str(err) + ")")
 
-    def get_dirs(self):
+    def get_dirs(self, export_csv=True):
         """
          get dirs and put in pandas df
         """
@@ -224,8 +224,9 @@ class MiSeqParser:
                                             'fastq_dir', 'fastq_dir_create_date', 'rta_complete'])
 
             # output dirs to csv
-            output_csv_filename = datetime.now().strftime(self.log_file_dir + 'dirlist_%Y%m%d_%H%M%S.csv')
-            dirs_df.to_csv(output_csv_filename, encoding='utf-8')
+            if export_csv:
+                output_csv_filename = datetime.now().strftime(self.log_file_dir + 'dirlist_%Y%m%d_%H%M%S.csv')
+                dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
             # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
             dirs_df_rta_complete = dirs_df[dirs_df["rta_complete"] == True]
             return(dirs_df_rta_complete)
@@ -378,7 +379,7 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: parse_fastq_metadata_dirs Failed (" + str(err) + ")")
 
-    def parse_fastq_files(self):
+    def parse_fastq_files(self, export_csv=True):
         """
          parse fastq files
         """
@@ -425,8 +426,10 @@ class MiSeqParser:
                     sample_ids.append(sample_id)
                     fastq_create_dates.append(fastq_create_date)
                 fastq_df = pd.DataFrame(list(zip(sample_ids, fastq_create_dates, fastq_files_list)), columns=['sample_id', 'fastq_create_date', 'fastq_path'])
-                output_csv_filename = datetime.now().strftime(self.log_file_dir+'Fastq_'+align_subdir_name+'_filelist_%Y%m%d_%H%M%S.csv')
-                fastq_df.to_csv(output_csv_filename, encoding='utf-8')
+
+                if export_csv:
+                    output_csv_filename = datetime.now().strftime(self.log_file_dir+'Fastq_'+align_subdir_name+'_filelist_%Y%m%d_%H%M%S.csv')
+                    fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
                 # unique subset of sample_ids sorted by name
 
                 sample_ids = sorted(unique(sample_ids))
@@ -459,7 +462,7 @@ class MiSeqParser:
             from mydata.models.settings.serialize import save_settings_to_disk, load_settings
             from mydata.conf import settings
 
-            #dirs_df = self.parse_fastq_files()
+            dirs_df = self.get_dirs(export_csv=False)
             api_logger.info('Start: set config')
             if settings.data_directory != self.data_directory: settings.data_directory = self.data_directory
             if settings.folder_structure != self.folder_structure: settings.folder_structure = self.folder_structure
@@ -472,7 +475,7 @@ class MiSeqParser:
             # assert settings.data_directory == self.data_directory
             # assert settings.folder_structure == self.folder_structure
             # assert settings.mytardis_url == self.mytardis_url
-            #return (dirs_df)
+            return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: set_mydata_settings Failed (" + str(err) + ")")
 
@@ -481,7 +484,7 @@ class MiSeqParser:
          call mydata through subprocess to scan and upload data
         """
         try:
-            #dirs_df = self.set_mydata_settings_py()
+            dirs_df = self.set_mydata_settings_py()
 
             # call mydata-python and start folder scan
             api_logger.info('Start: mydata scan')
@@ -489,7 +492,7 @@ class MiSeqParser:
             result_scan = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_scan.returncode) + ']\n stdout: [' + str(result_scan.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_scan.stderr) + ']')
             api_logger.info('End: mydata scan')
-            #return (dirs_df)
+            return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: scan_mydata_subprocess Failed (" + str(err) + ")")
 
@@ -498,23 +501,23 @@ class MiSeqParser:
          call mydata through subprocess to scan and upload data
         """
         try:
-            #dirs_df = self.scan_mydata_subprocess()
+            dirs_df = self.scan_mydata_subprocess()
             # call mydata-python and start upload
             api_logger.info('Start: mydata upload')
             command = ['mydata', 'upload', '-v']
             result_upload = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_upload.returncode) + ']\n stdout: [' + str(result_upload.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_upload.stderr) + ']')
             api_logger.info('End: mydata upload')
-            #return (dirs_df)
+            return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: upload_mydata_subprocess Failed (" + str(err) + ")")
 
-    def move_parsing_backup(self):
+    def move_parsing_backup(self, dirs_df):
         """
          move parsed files from upload to backup; must happen after mydata upload is complete
         """
         try:
-            dirs_df = self.get_dirs()
+            #dirs_df = self.get_dirs(export_csv=False)
             output_dir = self.output_dir
             copy_parsed_dir = self.copy_parsed_dir
             dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
@@ -533,12 +536,12 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: move_parsing_backup Failed (" + str(err) + ")")
 
-    def move_staging_backup(self):
+    def move_staging_backup(self, dirs_df):
         """
          move data out of staging folder and to backup folder; must happen after parsing is complete
         """
         try:
-            dirs_df = self.get_dirs()
+            #dirs_df = self.get_dirs(export_csv=False)
             input_dir = self.input_dir
             copy_original_dir = self.copy_original_dir
             dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
@@ -556,12 +559,12 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: move_staging_backup Failed (" + str(err) + ")")
 
-    def complete_backup(self, move_parsing, move_staging):
+    def complete_upload_backup(self, move_parsing, move_staging):
         """
          Create MYTDComplete.txt files in parsed and original folders in backup directory
         """
         try:
-            dirs_df = self.get_dirs()
+            dirs_df = self.upload_mydata_subprocess()
             copy_parsed_dir = self.copy_parsed_dir
             copy_original_dir = self.copy_original_dir
             dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
@@ -574,8 +577,8 @@ class MiSeqParser:
                 output_copy_dir = copy_original_dir + project + "/" + run_id + "/"
 
                 if move_parsing and move_staging:
-                    self.move_parsing_backup()
-                    self.move_staging_backup()
+                    self.move_parsing_backup(dirs_df)
+                    self.move_staging_backup(dirs_df)
                     complete_filepath = output_parse_dir + "MYTDComplete.txt"
                     with open(complete_filepath, mode='a') as file:
                         file.write('[START]\n mytd_parser completed at [%s]\n Project: %s\n RunID: %s\n Original backup copied: [%s]\n Parsed backup copied: [%s]\n[END]' %
@@ -583,17 +586,17 @@ class MiSeqParser:
                     copy2(complete_filepath, output_copy_dir)
                     api_logger.info('Backup Parsed and Original: '+project +', '+run_id+', ['+output_copy_dir+', '+output_parse_dir+']')
                 elif move_parsing and not move_staging:
-                    self.move_parsing_backup()
+                    self.move_parsing_backup(dirs_df)
                     complete_filepath = output_parse_dir + "MYTDComplete.txt"
                     with open(complete_filepath, mode='a') as file:
-                        file.write('[START]\n mytd_parser completed at [%s]\n Project: %s\n RunID: %s\n Original backup copied: [%s]\n[END]' %
+                        file.write('[START]\n mytd_parser completed at [%s]\n Project: %s\n RunID: %s\n Original backup copied: NA\n Parsed backup copied: [%s] \n[END]' %
                                    (datetime.now(), project,run_id, output_parse_dir))
                     api_logger.info('Backup Parsed: ' + project + ', ' + run_id + ', [' + output_parse_dir+']')
                 elif not move_parsing and move_staging:
-                    self.move_staging_backup()
+                    self.move_staging_backup(dirs_df)
                     complete_filepath = output_copy_dir + "MYTDComplete.txt"
                     with open(complete_filepath, mode='a') as file:
-                        file.write('[START]\n mytd_parser completed at [%s]\n Project: %s\n RunID: %s\n Original backup copied: [%s]\n[END]' %
+                        file.write('[START]\n mytd_parser completed at [%s]\n Project: %s\n RunID: %s\n Original backup copied: [%s]\n Parsed backup copied: NA \n[END]' %
                                    (datetime.now(), project,run_id, output_copy_dir))
                     api_logger.info('Backup Original: ' + project + ', ' + run_id+', [' + output_copy_dir+']')
                 elif not move_parsing and not move_staging:

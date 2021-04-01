@@ -14,13 +14,8 @@ from mytd_parser.parse_seq_run import MiSeqParser
 
 miseq_parser = MiSeqParser()
 
+# parse runs in /Staging directory
 miseq_parser.parse_fastq_files()
-#parser.complete_backup(move_parsing=False, move_staging=True)
 
-# not using mydata-python; just parsing and triggering upload in mydata.exe on daily timer
-# mydata-python breaking on upload - FileNotFoundError: [WinError 2] The system cannot find the file specified
-# added issue to mydata-python repo
-#miseq_parser.set_mydata_settings_py()
-#miseq_parser.scan_mydata_subprocess()
-#miseq_parser.upload_mydata_subprocess()
-
+# Read parsed runs in /Upload directory, upload to MyData, and move parsed files and original files to /Backup directory
+miseq_parser.complete_upload_backup(move_parsing=False, move_staging=False)
