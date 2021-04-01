@@ -6,6 +6,7 @@ LAST MODIFIED: 03/24/2021
 """
 
 from . import settings
+import sys
 import os, glob
 import pandas as pd
 from shutil import copy2, move
@@ -15,6 +16,7 @@ from distutils.dir_util import copy_tree
 from subprocess import PIPE, run
 import datetime
 from datetime import datetime
+import platform
 import pathlib
 
 def unique(list1):
@@ -23,6 +25,52 @@ def unique(list1):
     # convert the set to the list
     unique_list = (list(list_set))
     return(unique_list)
+
+def get_creation_dt(directory):
+    """
+    Try to get the date that a file was created, falling back to when it was
+    last modified if that isn't possible.
+    See http://stackoverflow.com/a/39501288/1709587 for explanation.
+    """
+    if platform.system() == 'Windows':
+        return os.path.getctime(directory)
+    else:
+        stat = os.stat(directory)
+        try:
+            return stat.st_birthtime
+        except AttributeError:
+            # We're probably on Linux. No easy way to get creation dates here,
+            # so we'll settle for when its content was last modified.
+            return stat.st_mtime
+
+def change_creation_dt(directory, mod_date):
+    """
+    change creation date of directory
+    source: https://stackoverflow.com/questions/4996405/how-do-i-change-the-file-creation-date-of-a-windows-file
+    """
+    try:
+        if platform.system() == 'Windows':
+            import pywintypes
+            from win32file import CreateFile, SetFileTime, CloseHandle
+            from win32file import GENERIC_WRITE, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, FILE_SHARE_WRITE
+            win_time = pywintypes.Time(mod_date)
+            fh = CreateFile(directory, GENERIC_WRITE, FILE_SHARE_WRITE, None, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, 0)
+            SetFileTime(fh, win_time, win_time, win_time)
+            CloseHandle(fh)
+        else:
+            os.utime(directory, (mod_date, mod_date))
+    except Exception as err:
+        raise RuntimeError("** Error: change_creation_dt Failed (" + str(err) + ")")
+
+def modify_create_date(old_dir, new_dir):
+    """
+     modify new_dir creation date to match old_dir creation date
+    """
+    try:
+        create_date = get_creation_dt(old_dir)
+        change_creation_dt(new_dir, create_date)
+    except Exception as err:
+        raise RuntimeError("** Error: modify_create_date Failed (" + str(err) + ")")
 
 class MiSeqParser:
     def __init__(self, input_dir=settings.MISEQ_INPUT_DIR,
@@ -67,19 +115,43 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: check_rta_complete Failed (" + str(err) + ")")
 
+    def get_run_id_xml(self, input_run_dir):
+        """
+         parse CompleteJobInfo.xml to get correct run id
+         If data are sent multiple times via MyData, mydata-seq-fac will append
+         the folder with "-1"; this way the referenced run id is always the correct run id
+         for data on the server.
+        """
+        try:
+            import xml.etree.ElementTree as ET
+            complete_file_name = 'CompletedJobInfo.xml'
+            # grab newest CompletedJobInfo.xml in directory
+            complete_file_path = max(glob.glob(f'{input_run_dir}/**/{complete_file_name}', recursive=True))
+            complete_file_path = complete_file_path.replace('\\', '/')
+            tree = ET.parse(complete_file_path)
+            root = tree.getroot()
+            for rid in root.findall('RTARunInfo'):
+                RunID = rid.find('RunID').text
+            return(RunID)
+        except Exception as err:
+            raise RuntimeError("** Error: get_run_id_xml Failed (" + str(err) + ")")
+
     def get_dirs(self):
         """
          get dirs and put in pandas df
         """
         try:
-            run_dirs = []
             run_ids = []
+            run_dirs = []
             align_subdirs = []
             fastq_dirs = []
             projects = []
             num_align_subdirs = []
             rta_completes = []
             num_run_dirs = []
+            run_dirs_create_dates = []
+            fastq_dirs_create_dates = []
+            align_subdirs_create_dates = []
             project_dirs = glob.glob(os.path.join(self.input_dir, '*/'))
 
             for project_dir in project_dirs:
@@ -100,8 +172,11 @@ class MiSeqParser:
                     # if rta_complete exists, sets variable to True to be filtered on
                     # to only process rta_complete directories
                     rta_complete = self.check_rta_complete(run_dir)
-                    # grab run_id from path name
-                    run_id = Path(run_dir).name
+                    # grab run_id from CompleteJobInfo.xml
+                    run_id = self.get_run_id_xml(run_dir)
+
+                    run_dir_create_date = datetime.fromtimestamp(get_creation_dt(run_dir)).strftime('%Y-%m-%d %H:%M:%S')
+                    #run_id = Path(run_dir).name
                     alignment_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
                     # convert forward slashes to backwards slashes
                     alignment_dirs_list = [dir_path.replace('\\', '/') for dir_path in alignment_dirs_list]
@@ -114,6 +189,8 @@ class MiSeqParser:
                     # convert forward slashes to backwards slashes
                     align_subdirs_list = [dir_path.replace('\\', '/') for dir_path in align_subdirs_list]
                     for align_subdir in align_subdirs_list:
+
+                        align_subdir_create_date = datetime.fromtimestamp(get_creation_dt(align_subdir)).strftime('%Y-%m-%d %H:%M:%S')
                         num_align_subdir = len(align_subdirs_list)
                         fastq_dirs_list = glob.glob(os.path.join(align_subdir, '*/'))
                         # convert forward slashes to backwards slashes
@@ -122,22 +199,29 @@ class MiSeqParser:
                         fastq_dir = [fqdir for fqdir in fastq_dirs_list if "Fastq" in fqdir]
                         # convert list to string
                         fastq_dir = ''.join(fastq_dir)
+
+                        fastq_dir_create_date = datetime.fromtimestamp(get_creation_dt(fastq_dir)).strftime('%Y-%m-%d %H:%M:%S')
                         # grab all other dirs and leave as list
                         # other_dirs = [fqdir for fqdir in fastq_dirs_list if not "Fastq" in fqdir]
 
                         # append to lists
                         projects.append(project)
-                        run_dirs.append(run_dir)
                         run_ids.append(run_id)
-                        align_subdirs.append(align_subdir)
-                        fastq_dirs.append(fastq_dir)
+                        run_dirs.append(run_dir)
+                        run_dirs_create_dates.append(run_dir_create_date)
                         num_run_dirs.append(num_run_dir)
+                        align_subdirs.append(align_subdir)
+                        align_subdirs_create_dates.append(align_subdir_create_date)
                         num_align_subdirs.append(num_align_subdir)
+                        fastq_dirs.append(fastq_dir)
+                        fastq_dirs_create_dates.append(fastq_dir_create_date)
                         rta_completes.append(rta_complete)
-            dirs_df = pd.DataFrame(list(zip(projects, run_dirs, run_ids, align_subdirs, fastq_dirs, num_run_dirs,
-                                            num_align_subdirs,rta_completes)),
-                                   columns=['project', 'run_dir', 'run_id', 'align_subdir', 'fastq_dir', 'num_run_dir',
-                                            'num_align_subdir','rta_complete'])
+            dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dirs, run_dirs_create_dates, num_run_dirs,
+                                            align_subdirs, align_subdirs_create_dates, num_align_subdirs,
+                                            fastq_dirs,fastq_dirs_create_dates,rta_completes)),
+                                   columns=['project', 'run_id', 'run_dir','run_dir_create_date', 'num_run_dir',
+                                            'align_subdir', 'align_subdir_create_date', 'num_align_subdir',
+                                            'fastq_dir', 'fastq_dir_create_date', 'rta_complete'])
 
             # output dirs to csv
             output_csv_filename = datetime.now().strftime(self.log_file_dir + 'dirlist_%Y%m%d_%H%M%S.csv')
@@ -168,15 +252,18 @@ class MiSeqParser:
                 project = row['project']
                 run_dir = row['run_dir']
                 run_id = row['run_id']
+                run_dir_create_date = row['run_dir_create_date']
                 align_subdir = row['align_subdir']
                 fastq_dir = row['fastq_dir']
                 # log info
                 api_logger.info('copy_metadata_dirs: '+project+', '+run_id+', ['+run_dir+', '+align_subdir+', '+fastq_dir+'], '+str(num_align_subdir))
 
                 output_metadata_dir = output_dir + project + "/" + run_id + "/run_metadata_"+run_id+"/"
-                # if directory doesn't exist, create it
+                # if directory doesn't exist, create it and modify the run dir create date
                 if not os.path.exists(output_metadata_dir):
                     os.makedirs(output_metadata_dir)
+                    modify_create_date(run_dir, output_dir + project + "/" + run_id + "/")
+                    modify_create_date(run_dir, output_metadata_dir)
 
                 run_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
                 run_dirs_list = [dir_path.replace('\\', '/') for dir_path in run_dirs_list]
@@ -215,6 +302,7 @@ class MiSeqParser:
                     for keep_dir in keep_dirs_list:
                         dir_name = Path(keep_dir).name
                         copy_tree(keep_dir,output_metadata_dir+dir_name+'/')
+                        modify_create_date(keep_dir, output_metadata_dir+dir_name+'/')
                         dir_count+=1
                     # log info
                     api_logger.info('End copied ' + str(dir_count) + ' dirs')
@@ -267,6 +355,7 @@ class MiSeqParser:
                 output_fastq_metadata_dir = output_metadata_dir + 'Fastq_' + align_subdir_name + '/'
                 if not os.path.exists(output_fastq_metadata_dir):
                     os.makedirs(output_fastq_metadata_dir)
+                    modify_create_date(fastq_dir, output_fastq_metadata_dir)
                 file_count=0
                 for file in file_list:
                     copy2(file, output_fastq_metadata_dir)
@@ -280,6 +369,7 @@ class MiSeqParser:
                     output_fastq_metadata_subdir = output_fastq_metadata_dir+dir_name+'/'
                     if not os.path.exists(output_fastq_metadata_subdir):
                         os.makedirs(output_fastq_metadata_subdir)
+                        modify_create_date(keep_dir, output_fastq_metadata_subdir)
                     copy_tree(keep_dir,output_fastq_metadata_subdir)
                     dir_count+=1
                 # log info
@@ -308,6 +398,9 @@ class MiSeqParser:
 
                 output_run_dir = output_dir + project + "/" + run_id + "/"
                 output_fastq_dir = output_run_dir + "Fastq_"+align_subdir_name + "/"
+                if not os.path.exists(output_fastq_dir):
+                    os.makedirs(output_fastq_dir)
+                    modify_create_date(fastq_dir, output_fastq_dir)
 
                 fastq_files_list = glob.glob(os.path.join(fastq_dir, '*.fastq.gz'))
                 fastq_files_list = [dir_path.replace('\\', '/') for dir_path in fastq_files_list]
@@ -322,13 +415,16 @@ class MiSeqParser:
                 api_logger.info('Start copying ' + str(num_files) + ' files')
 
                 sample_ids = []
+                fastq_create_dates = []
                 for fastq_file in fastq_files_list:
                     # parse each fastq filename for the sample_id
                     # leftmost after underscore split
+                    fastq_create_date = datetime.fromtimestamp(get_creation_dt(fastq_file)).strftime('%Y-%m-%d %H:%M:%S')
                     fastq_name = Path(fastq_file).name
                     sample_id = fastq_name.split('_', 1)[0]
                     sample_ids.append(sample_id)
-                fastq_df = pd.DataFrame(list(zip(sample_ids, fastq_files_list)), columns=['sample_id', 'fastq_path'])
+                    fastq_create_dates.append(fastq_create_date)
+                fastq_df = pd.DataFrame(list(zip(sample_ids, fastq_create_dates, fastq_files_list)), columns=['sample_id', 'fastq_create_date', 'fastq_path'])
                 output_csv_filename = datetime.now().strftime(self.log_file_dir+'Fastq_'+align_subdir_name+'_filelist_%Y%m%d_%H%M%S.csv')
                 fastq_df.to_csv(output_csv_filename, encoding='utf-8')
                 # unique subset of sample_ids sorted by name
@@ -343,6 +439,7 @@ class MiSeqParser:
                         output_fastq_sid_dir = output_fastq_dir + sample_id + "/"
                         if not os.path.exists(output_fastq_sid_dir):
                             os.makedirs(output_fastq_sid_dir)
+                            modify_create_date(fastq_dir, output_fastq_sid_dir)
                         copy2(fastq_file, output_fastq_sid_dir)
                         file_count+=1
                 for summary_file in fastq_summary_file_list:
@@ -353,6 +450,64 @@ class MiSeqParser:
             return(dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: parse_fastq_files Failed (" + str(err) + ")")
+
+    def set_mydata_settings_py(self):
+        """
+         set config settings
+        """
+        try:
+            from mydata.models.settings.serialize import save_settings_to_disk, load_settings
+            from mydata.conf import settings
+
+            #dirs_df = self.parse_fastq_files()
+            api_logger.info('Start: set config')
+            if settings.data_directory != self.data_directory: settings.data_directory = self.data_directory
+            if settings.folder_structure != self.folder_structure: settings.folder_structure = self.folder_structure
+            if settings.mytardis_url != self.mytardis_url: settings.mytardis_url = self.mytardis_url
+            save_settings_to_disk()
+            load_settings()
+            api_logger.info('Config updated: ' + str(settings.data_directory) + ', ' + str(settings.folder_structure) + ', ' + str(settings.mytardis_url))
+            api_logger.info('End: set config')
+            # check if settings were updated
+            # assert settings.data_directory == self.data_directory
+            # assert settings.folder_structure == self.folder_structure
+            # assert settings.mytardis_url == self.mytardis_url
+            #return (dirs_df)
+        except Exception as err:
+            raise RuntimeError("** Error: set_mydata_settings Failed (" + str(err) + ")")
+
+    def scan_mydata_subprocess(self):
+        """
+         call mydata through subprocess to scan and upload data
+        """
+        try:
+            #dirs_df = self.set_mydata_settings_py()
+
+            # call mydata-python and start folder scan
+            api_logger.info('Start: mydata scan')
+            command = ['mydata', 'scan', '-v']
+            result_scan = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            api_logger.info('subprocess result:\n returncode: [' + str(result_scan.returncode) + ']\n stdout: [' + str(result_scan.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_scan.stderr) + ']')
+            api_logger.info('End: mydata scan')
+            #return (dirs_df)
+        except Exception as err:
+            raise RuntimeError("** Error: scan_mydata_subprocess Failed (" + str(err) + ")")
+
+    def upload_mydata_subprocess(self):
+        """
+         call mydata through subprocess to scan and upload data
+        """
+        try:
+            #dirs_df = self.scan_mydata_subprocess()
+            # call mydata-python and start upload
+            api_logger.info('Start: mydata upload')
+            command = ['mydata', 'upload', '-v']
+            result_upload = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            api_logger.info('subprocess result:\n returncode: [' + str(result_upload.returncode) + ']\n stdout: [' + str(result_upload.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_upload.stderr) + ']')
+            api_logger.info('End: mydata upload')
+            #return (dirs_df)
+        except Exception as err:
+            raise RuntimeError("** Error: upload_mydata_subprocess Failed (" + str(err) + ")")
 
     def move_parsing_backup(self):
         """
@@ -447,100 +602,30 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: complete_copy_upload Failed (" + str(err) + ")")
 
-## Skip below until mydata-python working - issue submitted on GitHub
+## Skip below - not using
 
     def set_mydata_settings_subprocess(self):
         """
          set config settings
         """
         try:
-            dirs_df = self.parse_fastq_files()
+            #dirs_df = self.parse_fastq_files()
             # using subprocess.call method
             api_logger.info('Start: mydata config settings')
             command = ['mydata', 'config', 'set', 'data_directory', self.data_directory]
             result_dd = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-            api_logger.info(
-                'subprocess result: ' + str(result_dd.returncode) + ', ' + str(result_dd.stdout) + ', ' + str(
-                    result_dd.stderr))
+            #api_logger.info('subprocess result: ' + str(result_dd.returncode) + ', ' + str(result_dd.stdout) + ', ' + str(result_dd.stderr))
 
             command = ['mydata', 'config', 'set', 'folder_structure', self.folder_structure]
             result_fs = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-            api_logger.info(
-                'subprocess result: ' + str(result_fs.returncode) + ', ' + str(result_fs.stdout) + ', ' + str(
-                    result_fs.stderr))
+            #api_logger.info('subprocess result: ' + str(result_fs.returncode) + ', ' + str(result_fs.stdout) + ', ' + str(result_fs.stderr))
 
             command = ['mydata', 'config', 'set', 'mytardis_url', self.mytardis_url]
             result_url = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-            api_logger.info(
-                'subprocess result: ' + str(result_url.returncode) + ', ' + str(result_url.stdout) + ', ' + str(
-                    result_url.stderr))
+            #api_logger.info('subprocess result: ' + str(result_url.returncode) + ', ' + str(result_url.stdout) + ', ' + str(result_url.stderr))
             api_logger.info('End: mydata config settings')
 
-            return (dirs_df)
-        except Exception as err:
-            raise RuntimeError("** Error: set_mydata_settings Failed (" + str(err) + ")")
-
-    def scan_mydata_subprocess(self):
-        """
-         call mydata through subprocess to scan and upload data
-        """
-        try:
-            dirs_df = self.set_mydata_settings_subprocess()
-
-            # call mydata-python and start folder scan
-            api_logger.info('Start: mydata scan')
-            command = ['mydata', 'scan', '-v']
-            result_scan = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-            api_logger.info(
-                'subprocess result: ' + str(result_scan.returncode) + ', ' + str(result_scan.stdout) + ', ' + str(
-                    result_scan.stderr))
-            api_logger.info('End: mydata scan')
-            return (dirs_df)
-        except Exception as err:
-            raise RuntimeError("** Error: scan_mydata_subprocess Failed (" + str(err) + ")")
-
-    def upload_mydata_subprocess(self):
-        """
-         call mydata through subprocess to scan and upload data
-        """
-        try:
-            dirs_df = self.scan_mydata_subprocess()
-            # call mydata-python and start upload
-            api_logger.info('Start: mydata upload')
-            command = ['mydata', 'upload', '-v']
-            result_upload = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-            api_logger.info(
-                'subprocess result: ' + str(result_upload.returncode) + ', ' + str(result_upload.stdout) + ', ' + str(
-                    result_upload.stderr))
-            api_logger.info('End: mydata upload')
-            return (dirs_df)
-        except Exception as err:
-            raise RuntimeError("** Error: upload_mydata_subprocess Failed (" + str(err) + ")")
-
-    def set_mydata_settings_py(self):
-        """
-         set config settings
-        """
-        try:
-            from mydata.models.settings.serialize import save_settings_to_disk, load_settings
-            from mydata.conf import settings
-
-            dirs_df = self.parse_fastq_files()
-            api_logger.info('Start: set config')
-            if settings.data_directory != self.data_directory: settings.data_directory = self.data_directory
-            if settings.folder_structure != self.folder_structure: settings.folder_structure = self.folder_structure
-            if settings.mytardis_url != self.mytardis_url: settings.mytardis_url = self.mytardis_url
-            save_settings_to_disk()
-            load_settings()
-            api_logger.info(
-                'Config updated: ' + str(settings.data_directory) + ', ' + str(settings.folder_structure) + ', ' + str(
-                    settings.mytardis_url))
-            api_logger.info('End: set config')
-            # check if settings were updated
-            # assert settings.data_directory == self.data_directory
-            # assert settings.folder_structure == self.folder_structure
-            # assert settings.mytardis_url == self.mytardis_url
-            return (dirs_df)
+            #return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: set_mydata_settings Failed (" + str(err) + ")")
 
@@ -552,14 +637,13 @@ class MiSeqParser:
             from mydata.conf import settings
             from mydata.commands import scan
 
-            dirs_df = self.set_mydata_settings_py()
+            #dirs_df = self.set_mydata_settings_py()
             # call mydata-python and start folder scan
             api_logger.info('Start: mydata scan')
             # users, groups, exps, folders = scan.scan()
             scan.scan_cmd()
-            # api_logger.info('py result: '+str(scan.display_scan_summary(users, groups, exps, folders)))
             api_logger.info('End: mydata scan')
-            return (dirs_df)
+            #return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: scan_mydata_py Failed (" + str(err) + ")")
 
@@ -571,12 +655,12 @@ class MiSeqParser:
             from mydata.conf import settings
             from mydata.commands import upload
 
-            dirs_df = self.scan_mydata_py()
+            #dirs_df = self.scan_mydata_py()
             # call mydata-python and start upload
             api_logger.info('Start: mydata upload')
             upload.upload_cmd()
             # api_logger.info('py result: '+str(result_upload.returncode)+', '+str(result_upload.stdout)+', '+str(result_upload.stderr))
             api_logger.info('End: mydata upload')
-            return (dirs_df)
+            #return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: upload_mydata_py Failed (" + str(err) + ")")

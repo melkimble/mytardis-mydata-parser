@@ -23,7 +23,6 @@ isort==4.3.21
 lazy-object-proxy==1.5.2
 mccabe==0.6.1
 more-itertools==8.7.0
-mydata-python==0.0.1
 netifaces==0.10.9
 nodeenv==1.5.0
 numpy==1.19.5

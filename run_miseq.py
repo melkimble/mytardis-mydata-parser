@@ -20,6 +20,7 @@ miseq_parser.parse_fastq_files()
 # not using mydata-python; just parsing and triggering upload in mydata.exe on daily timer
 # mydata-python breaking on upload - FileNotFoundError: [WinError 2] The system cannot find the file specified
 # added issue to mydata-python repo
-#parser.upload_mydata_py()
-#parser.upload_mydata_subprocess()
+#miseq_parser.set_mydata_settings_py()
+#miseq_parser.scan_mydata_subprocess()
+#miseq_parser.upload_mydata_subprocess()
 

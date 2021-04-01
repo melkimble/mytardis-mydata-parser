@@ -26,26 +26,7 @@ class ServerParse(MiSeqParser):
         self.data_directory = data_directory
         print(self.input_dir)
 
-    def get_run_id_xml(self, input_run_dir):
-        """
-         parse CompleteJobInfo.xml to get correct run id
-         If data are sent multiple times via MyData, mydata-seq-fac will append
-         the folder with "-1"; this way the referenced run id is always the correct run id
-         for data on the server.
-        """
-        try:
-            import xml.etree.ElementTree as ET
-            complete_file_name = 'CompletedJobInfo.xml'
-            # grab newest CompletedJobInfo.xml in directory
-            complete_file_path = max(glob.glob(f'{input_run_dir}/**/{complete_file_name}', recursive=True))
-            complete_file_path = complete_file_path.replace('\\', '/')
-            tree = ET.parse(complete_file_path)
-            root = tree.getroot()
-            for rid in root.findall('RTARunInfo'):
-                RunID = rid.find('RunID').text
-            return(RunID)
-        except Exception as err:
-            raise RuntimeError("** Error: get_run_id_xml Failed (" + str(err) + ")")
+
 
     def get_dirs(self):
         """
