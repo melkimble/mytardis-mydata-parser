@@ -15,7 +15,7 @@ from mytd_parser.parse_seq_run import MiSeqParser
 miseq_parser = MiSeqParser()
 
 # parse runs in /Staging directory
-miseq_parser.parse_fastq_files()
+#miseq_parser.parse_fastq_files()
 
 # Read parsed runs in /Upload directory, upload to MyData, and move parsed files and original files to /Backup directory
 miseq_parser.complete_upload_backup(move_parsing=False, move_staging=False)

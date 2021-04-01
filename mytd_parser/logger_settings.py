@@ -6,11 +6,15 @@ LAST MODIFIED: 03/24/2021
 """
 
 import sys
+import os
 import logging
 from logging.config import dictConfig
 from datetime import datetime
 
 from . import settings
+
+if not os.path.exists(settings.LOG_FILE_DIR):
+    os.makedirs(settings.LOG_FILE_DIR)
 
 logging_config = dict(
     version=1,

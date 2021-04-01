@@ -454,27 +454,29 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: parse_fastq_files Failed (" + str(err) + ")")
 
-    def set_mydata_settings_py(self):
+    def set_mydata_settings_subprocess(self):
         """
-         set config settings
+         set config settings through subprocess call
         """
         try:
-            from mydata.models.settings.serialize import save_settings_to_disk, load_settings
-            from mydata.conf import settings
-
             dirs_df = self.get_dirs(export_csv=False)
-            api_logger.info('Start: set config')
-            if settings.data_directory != self.data_directory: settings.data_directory = self.data_directory
-            if settings.folder_structure != self.folder_structure: settings.folder_structure = self.folder_structure
-            if settings.mytardis_url != self.mytardis_url: settings.mytardis_url = self.mytardis_url
-            save_settings_to_disk()
-            load_settings()
-            api_logger.info('Config updated: ' + str(settings.data_directory) + ', ' + str(settings.folder_structure) + ', ' + str(settings.mytardis_url))
-            api_logger.info('End: set config')
-            # check if settings were updated
-            # assert settings.data_directory == self.data_directory
-            # assert settings.folder_structure == self.folder_structure
-            # assert settings.mytardis_url == self.mytardis_url
+            # using subprocess.call method
+            api_logger.info('Start: mydata config settings')
+            command = ['python', 'mydata-python/run.py', 'config', 'set', 'data_directory', self.data_directory]
+            result_dd = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            api_logger.info('subprocess result:\n returncode: [' + str(result_dd.returncode) + ']\n stdout: [' + str(result_dd.stdout).replace("\n", ", ") + ']\n stderr: [' + str(result_dd.stderr) + ']')
+
+            command = ['python', 'mydata-python/run.py', 'config', 'set', 'folder_structure', self.folder_structure]
+            result_fs = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            api_logger.info('subprocess result:\n returncode: [' + str(result_fs.returncode) + ']\n stdout: [' + str(result_fs.stdout).replace("\n", ", ") + ']\n stderr: [' + str(result_fs.stderr) + ']')
+
+            command = ['python', 'mydata-python/run.py', 'config', 'set', 'mytardis_url', self.mytardis_url]
+            result_url = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            api_logger.info('subprocess result:\n returncode: [' + str(result_url.returncode) + ']\n stdout: [' + str(result_url.stdout).replace("\n", ", ") + ']\n stderr: [' + str(result_url.stderr) + ']')
+
+            api_logger.info('Config updated: ' + str(self.data_directory) + ', ' + str(self.folder_structure) + ', ' + str(self.mytardis_url))
+            api_logger.info('End: mydata config settings')
+
             return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: set_mydata_settings Failed (" + str(err) + ")")
@@ -484,11 +486,11 @@ class MiSeqParser:
          call mydata through subprocess to scan and upload data
         """
         try:
-            dirs_df = self.set_mydata_settings_py()
+            dirs_df = self.set_mydata_settings_subprocess()
 
             # call mydata-python and start folder scan
             api_logger.info('Start: mydata scan')
-            command = ['mydata', 'scan', '-v']
+            command = ['python', 'mydata-python/run.py', 'scan', '-v']
             result_scan = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_scan.returncode) + ']\n stdout: [' + str(result_scan.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_scan.stderr) + ']')
             api_logger.info('End: mydata scan')
@@ -504,7 +506,7 @@ class MiSeqParser:
             dirs_df = self.scan_mydata_subprocess()
             # call mydata-python and start upload
             api_logger.info('Start: mydata upload')
-            command = ['mydata', 'upload', '-v']
+            command = ['python', 'mydata-python/run.py', 'upload', '-v']
             result_upload = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_upload.returncode) + ']\n stdout: [' + str(result_upload.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_upload.stderr) + ']')
             api_logger.info('End: mydata upload')
@@ -607,28 +609,28 @@ class MiSeqParser:
 
 ## Skip below - not using
 
-    def set_mydata_settings_subprocess(self):
+    def set_mydata_settings_py(self):
         """
          set config settings
         """
         try:
-            #dirs_df = self.parse_fastq_files()
-            # using subprocess.call method
-            api_logger.info('Start: mydata config settings')
-            command = ['mydata', 'config', 'set', 'data_directory', self.data_directory]
-            result_dd = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-            #api_logger.info('subprocess result: ' + str(result_dd.returncode) + ', ' + str(result_dd.stdout) + ', ' + str(result_dd.stderr))
+            from mydata.models.settings.serialize import save_settings_to_disk, load_settings
+            from mydata.conf import settings
 
-            command = ['mydata', 'config', 'set', 'folder_structure', self.folder_structure]
-            result_fs = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-            #api_logger.info('subprocess result: ' + str(result_fs.returncode) + ', ' + str(result_fs.stdout) + ', ' + str(result_fs.stderr))
-
-            command = ['mydata', 'config', 'set', 'mytardis_url', self.mytardis_url]
-            result_url = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
-            #api_logger.info('subprocess result: ' + str(result_url.returncode) + ', ' + str(result_url.stdout) + ', ' + str(result_url.stderr))
-            api_logger.info('End: mydata config settings')
-
-            #return (dirs_df)
+            dirs_df = self.get_dirs(export_csv=False)
+            api_logger.info('Start: set config')
+            if settings.data_directory != self.data_directory: settings.data_directory = self.data_directory
+            if settings.folder_structure != self.folder_structure: settings.folder_structure = self.folder_structure
+            if settings.mytardis_url != self.mytardis_url: settings.mytardis_url = self.mytardis_url
+            save_settings_to_disk()
+            load_settings()
+            api_logger.info('Config updated: ' + str(settings.data_directory) + ', ' + str(settings.folder_structure) + ', ' + str(settings.mytardis_url))
+            api_logger.info('End: set config')
+            # check if settings were updated
+            # assert settings.data_directory == self.data_directory
+            # assert settings.folder_structure == self.folder_structure
+            # assert settings.mytardis_url == self.mytardis_url
+            return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: set_mydata_settings Failed (" + str(err) + ")")
 

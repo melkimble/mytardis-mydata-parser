@@ -5,9 +5,11 @@ LAST MODIFIED: 03/24/2021
 """
 import os
 
-current_working_dir = os.getcwd()
-BASE_DIR = os.path.dirname(current_working_dir)
-BASE_DIR = BASE_DIR.replace('\\', '/')
+#current_working_dir = os.getcwd()
+#BASE_DIR = os.path.dirname(current_working_dir)
+#BASE_DIR = BASE_DIR.replace('\\', '/')
+
+BASE_DIR = "D:/GitHub/mytardis-mydata-parser"
 
 # parse_seq_run.py settings
 MISEQ_INPUT_DIR = BASE_DIR+"/NGS_Outputs/Staging/"
