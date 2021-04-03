@@ -26,9 +26,7 @@ class ServerParse(MiSeqParser):
         self.data_directory = data_directory
         print(self.input_dir)
 
-
-
-    def get_dirs(self):
+    def get_dirs(self, export_csv=True, RTAComplete=True):
         """
          get dirs and put in pandas df
         """
@@ -84,11 +82,16 @@ class ServerParse(MiSeqParser):
                                    columns=['project', 'run_dir', 'run_id', 'fastq_dir', 'num_run_dir',
                                             'num_align_subdir','rta_complete'])
             # output dirs to csv
-            output_csv_filename = datetime.now().strftime(self.log_file_dir + 'dirlist_%Y%m%d_%H%M%S.csv')
-            dirs_df.to_csv(output_csv_filename, encoding='utf-8')
-            # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
-            dirs_df_rta_complete = dirs_df[dirs_df["rta_complete"] == True]
-            return(dirs_df_rta_complete)
+            if export_csv:
+                output_csv_filename = datetime.now().strftime(self.log_file_dir + 'dirlist_%Y%m%d_%H%M%S.csv')
+                dirs_df.to_csv(output_csv_filename, encoding='utf-8')
+            if RTAComplete:
+                # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
+                # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
+                dirs_df_rta_complete = dirs_df[dirs_df["rta_complete"] == True]
+                return(dirs_df_rta_complete)
+            else:
+                return(dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: get_dirs Failed (" + str(err) + ")")
 
@@ -98,7 +101,7 @@ class ServerParse(MiSeqParser):
         """
         try:
             output_dir = self.output_dir
-            dirs_df = self.get_dirs()
+            dirs_df = self.get_dirs(export_csv=True, RTAComplete=True)
             for index, row in dirs_df.iterrows():
                 project = row['project']
                 run_id = row['run_id']

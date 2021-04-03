@@ -136,7 +136,7 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: get_run_id_xml Failed (" + str(err) + ")")
 
-    def get_dirs(self, export_csv=True):
+    def get_dirs(self, export_csv=True, RTAComplete=True):
         """
          get dirs and put in pandas df
         """
@@ -227,9 +227,12 @@ class MiSeqParser:
             if export_csv:
                 output_csv_filename = datetime.now().strftime(self.log_file_dir + 'dirlist_%Y%m%d_%H%M%S.csv')
                 dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
-            # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
-            dirs_df_rta_complete = dirs_df[dirs_df["rta_complete"] == True]
-            return(dirs_df_rta_complete)
+            if RTAComplete:
+                # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
+                dirs_df_rta_complete = dirs_df[dirs_df["rta_complete"] == True]
+                return(dirs_df_rta_complete)
+            else:
+                return(dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: get_dirs Failed (" + str(err) + ")")
 
@@ -238,7 +241,7 @@ class MiSeqParser:
          copy metadata dirs and files
         """
         try:
-            dirs_df = self.get_dirs()
+            dirs_df = self.get_dirs(export_csv=True, RTAComplete=True)
             output_dir = self.output_dir
             align_counter = 1
             for index, row in dirs_df.iterrows():
@@ -459,7 +462,6 @@ class MiSeqParser:
          set config settings through subprocess call
         """
         try:
-            dirs_df = self.get_dirs(export_csv=False)
             # using subprocess.call method
             api_logger.info('Start: mydata config settings')
             command = ['python', 'mydata-python/run.py', 'config', 'set', 'data_directory', self.data_directory]
@@ -476,8 +478,6 @@ class MiSeqParser:
 
             api_logger.info('Config updated: ' + str(self.data_directory) + ', ' + str(self.folder_structure) + ', ' + str(self.mytardis_url))
             api_logger.info('End: mydata config settings')
-
-            return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: set_mydata_settings Failed (" + str(err) + ")")
 
@@ -486,15 +486,14 @@ class MiSeqParser:
          call mydata through subprocess to scan and upload data
         """
         try:
-            dirs_df = self.set_mydata_settings_subprocess()
-
+            # make sure settings are correct
+            self.set_mydata_settings_subprocess()
             # call mydata-python and start folder scan
             api_logger.info('Start: mydata scan')
             command = ['python', 'mydata-python/run.py', 'scan', '-v']
             result_scan = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_scan.returncode) + ']\n stdout: [' + str(result_scan.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_scan.stderr) + ']')
             api_logger.info('End: mydata scan')
-            return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: scan_mydata_subprocess Failed (" + str(err) + ")")
 
@@ -503,14 +502,14 @@ class MiSeqParser:
          call mydata through subprocess to scan and upload data
         """
         try:
-            dirs_df = self.scan_mydata_subprocess()
+            # scan folders first
+            self.scan_mydata_subprocess()
             # call mydata-python and start upload
             api_logger.info('Start: mydata upload')
             command = ['python', 'mydata-python/run.py', 'upload', '-v']
             result_upload = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_upload.returncode) + ']\n stdout: [' + str(result_upload.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_upload.stderr) + ']')
             api_logger.info('End: mydata upload')
-            return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: upload_mydata_subprocess Failed (" + str(err) + ")")
 
@@ -519,21 +518,26 @@ class MiSeqParser:
          move parsed files from upload to backup; must happen after mydata upload is complete
         """
         try:
-            #dirs_df = self.get_dirs(export_csv=False)
             output_dir = self.output_dir
             copy_parsed_dir = self.copy_parsed_dir
-            dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
+            dirs_group_df = dirs_df.groupby(['project', 'run_id', 'rta_complete']).size().reset_index().rename(columns={0: 'count'})
             # print(dirs_group_df)
 
             for index, row in dirs_group_df.iterrows():
                 project = row['project']
                 run_id = row['run_id']
+                rta_complete = row['rta_complete']
                 api_logger.info('move_parsing_backup: '+project+', '+run_id)
                 input_copy_dir = output_dir + project + "/" + run_id + "/"
-                output_copy_dir = copy_parsed_dir + project + "/" + run_id + "/"
-                api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_copy_dir+']')
-                move(input_copy_dir, output_copy_dir)
-                api_logger.info('End: parse backup moved')
+                # if RTAComplete is false, continue to next item in list
+                if not rta_complete:
+                    api_logger.info('End: RTAComplete.txt does not exist - run was not parsed ['+project+ " - " +run_id + "]")
+                    continue
+                else:
+                    output_copy_dir = copy_parsed_dir + project + "/" + run_id + "/"
+                    api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_copy_dir+']')
+                    move(input_copy_dir, output_copy_dir)
+                    api_logger.info('End: parse backup moved')
             return(dirs_group_df)
         except Exception as err:
             raise RuntimeError("** Error: move_parsing_backup Failed (" + str(err) + ")")
@@ -543,20 +547,25 @@ class MiSeqParser:
          move data out of staging folder and to backup folder; must happen after parsing is complete
         """
         try:
-            #dirs_df = self.get_dirs(export_csv=False)
             input_dir = self.input_dir
             copy_original_dir = self.copy_original_dir
-            dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
+            dirs_group_df = dirs_df.groupby(['project', 'run_id', 'rta_complete']).size().reset_index().rename(columns={0: 'count'})
 
             for index, row in dirs_group_df.iterrows():
                 project = row['project']
                 run_id = row['run_id']
+                rta_complete = row['rta_complete']
                 api_logger.info('move_staging_backup: '+project+', '+run_id)
                 input_copy_dir = input_dir + project + "/" + run_id + "/"
-                output_copy_dir = copy_original_dir + project + "/" + run_id + "/"
-                api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_copy_dir+']')
-                move(input_copy_dir, output_copy_dir)
-                api_logger.info('End: original backup moved')
+                # if RTAComplete is false, continue to next item in list
+                if not rta_complete:
+                    api_logger.info('End: RTAComplete.txt does not exist - run was not parsed ['+project+ " - " +run_id + "]")
+                    continue
+                else:
+                    output_copy_dir = copy_original_dir + project + "/" + run_id + "/"
+                    api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_copy_dir+']')
+                    move(input_copy_dir, output_copy_dir)
+                    api_logger.info('End: original backup moved')
             return(dirs_group_df)
         except Exception as err:
             raise RuntimeError("** Error: move_staging_backup Failed (" + str(err) + ")")
@@ -566,7 +575,10 @@ class MiSeqParser:
          Create MYTDComplete.txt files in parsed and original folders in backup directory
         """
         try:
-            dirs_df = self.upload_mydata_subprocess()
+            self.upload_mydata_subprocess()
+            # with RTAComplete=False, all directories will be placed into backup
+            # even if run was not successful
+            dirs_df = self.get_dirs(export_csv=False, RTAComplete=False)
             copy_parsed_dir = self.copy_parsed_dir
             copy_original_dir = self.copy_original_dir
             dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
@@ -617,7 +629,6 @@ class MiSeqParser:
             from mydata.models.settings.serialize import save_settings_to_disk, load_settings
             from mydata.conf import settings
 
-            dirs_df = self.get_dirs(export_csv=False)
             api_logger.info('Start: set config')
             if settings.data_directory != self.data_directory: settings.data_directory = self.data_directory
             if settings.folder_structure != self.folder_structure: settings.folder_structure = self.folder_structure
@@ -630,7 +641,6 @@ class MiSeqParser:
             # assert settings.data_directory == self.data_directory
             # assert settings.folder_structure == self.folder_structure
             # assert settings.mytardis_url == self.mytardis_url
-            return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: set_mydata_settings Failed (" + str(err) + ")")
 
@@ -642,13 +652,12 @@ class MiSeqParser:
             from mydata.conf import settings
             from mydata.commands import scan
 
-            #dirs_df = self.set_mydata_settings_py()
+            #self.set_mydata_settings_py()
             # call mydata-python and start folder scan
             api_logger.info('Start: mydata scan')
             # users, groups, exps, folders = scan.scan()
             scan.scan_cmd()
             api_logger.info('End: mydata scan')
-            #return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: scan_mydata_py Failed (" + str(err) + ")")
 
@@ -660,12 +669,11 @@ class MiSeqParser:
             from mydata.conf import settings
             from mydata.commands import upload
 
-            #dirs_df = self.scan_mydata_py()
+            #self.scan_mydata_py()
             # call mydata-python and start upload
             api_logger.info('Start: mydata upload')
             upload.upload_cmd()
             # api_logger.info('py result: '+str(result_upload.returncode)+', '+str(result_upload.stdout)+', '+str(result_upload.stderr))
             api_logger.info('End: mydata upload')
-            #return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: upload_mydata_py Failed (" + str(err) + ")")
