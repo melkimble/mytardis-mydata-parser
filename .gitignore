@@ -94,7 +94,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-/mytardis-mydata-parser-env/*
+/mytd-env/*
 
 # Spyder project settings
 .spyderproject
@@ -124,3 +124,4 @@ dmypy.json
 #mydata-python git repo
 /mydata-python/*
 /logs/*
+/mydata-python/
