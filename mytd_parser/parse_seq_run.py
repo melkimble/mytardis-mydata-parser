@@ -549,23 +549,17 @@ class MiSeqParser:
         try:
             input_dir = self.input_dir
             copy_original_dir = self.copy_original_dir
-            dirs_group_df = dirs_df.groupby(['project', 'run_id', 'rta_complete']).size().reset_index().rename(columns={0: 'count'})
+            dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
 
             for index, row in dirs_group_df.iterrows():
                 project = row['project']
                 run_id = row['run_id']
-                rta_complete = row['rta_complete']
                 api_logger.info('move_staging_backup: '+project+', '+run_id)
                 input_copy_dir = input_dir + project + "/" + run_id + "/"
-                # if RTAComplete is false, continue to next item in list
-                if not rta_complete:
-                    api_logger.info('End: RTAComplete.txt does not exist - run was not parsed ['+project+ " - " +run_id + "]")
-                    continue
-                else:
-                    output_copy_dir = copy_original_dir + project + "/" + run_id + "/"
-                    api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_copy_dir+']')
-                    move(input_copy_dir, output_copy_dir)
-                    api_logger.info('End: original backup moved')
+                output_copy_dir = copy_original_dir + project + "/" + run_id + "/"
+                api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_copy_dir+']')
+                move(input_copy_dir, output_copy_dir)
+                api_logger.info('End: original backup moved')
             return(dirs_group_df)
         except Exception as err:
             raise RuntimeError("** Error: move_staging_backup Failed (" + str(err) + ")")
