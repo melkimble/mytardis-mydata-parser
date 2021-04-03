@@ -16,15 +16,15 @@ from datetime import datetime
 from mytd_parser.parse_seq_run import MiSeqParser
 
 class ServerParse(MiSeqParser):
-    def __init__(self,input_dir=settings.SERVER_INPUT_DIR,
+    def __init__(self,staging_dir=settings.SERVER_STAGING_DIR,
                  output_dir=settings.SERVER_OUTPUT_DIR,
-                 data_directory=settings.MISEQ_DATA_DIRECTORY):
-        super().__init__(input_dir, output_dir, data_directory)
-        self.input_dir = input_dir
+                 data_directory=settings.SERVER_DATA_DIRECTORY):
+        super().__init__(staging_dir, output_dir, data_directory)
+        self.staging_dir = staging_dir
         self.output_dir = output_dir
         # mydata cfgs
         self.data_directory = data_directory
-        print(self.input_dir)
+        print(self.staging_dir)
 
     def get_dirs(self, export_csv=True, RTAComplete=True):
         """
@@ -38,7 +38,7 @@ class ServerParse(MiSeqParser):
             num_align_subdirs = []
             rta_completes = []
             num_run_dirs = []
-            project_dirs = glob.glob(os.path.join(self.input_dir, '*/'))
+            project_dirs = glob.glob(os.path.join(self.staging_dir, '*/'))
 
             for project_dir in project_dirs:
                 dir_length = len(os.listdir(project_dir))
