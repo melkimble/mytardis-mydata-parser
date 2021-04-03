@@ -100,6 +100,7 @@ class ServerParse(MiSeqParser):
          parse server copy of fastq files
         """
         try:
+            api_logger.info('[START] move_fastq_files')
             output_dir = self.output_dir
             dirs_df = self.get_dirs(export_csv=True, RTAComplete=True)
             for index, row in dirs_df.iterrows():
@@ -111,11 +112,12 @@ class ServerParse(MiSeqParser):
                     os.makedirs(output_fastq_dir)
                 fastq_files = glob.glob(os.path.join(fastq_dir, '**/*.fastq.gz'), recursive=True)
                 num_fastq_files = len(fastq_files)
-                api_logger.info('move_fastq_files: '+project+', '+run_id+', '+str(num_fastq_files)+' files from: [' + fastq_dir + '], to: [' + output_fastq_dir + ']')
+                api_logger.info('Start move: '+project+', '+run_id+', '+str(num_fastq_files)+' files from: [' + fastq_dir + '], to: [' + output_fastq_dir + ']')
                 fastq_counter=0
                 for fastq_file in fastq_files:
                     copy2(fastq_file, output_fastq_dir)
                     fastq_counter+=1
-                api_logger.info('End: copied '+str(fastq_counter)+' files')
+                api_logger.info('End: moved '+str(fastq_counter)+' files')
+            api_logger.info('[END] move_fastq_files')
         except Exception as err:
             raise RuntimeError("** Error: move_fastq_files Failed (" + str(err) + ")")

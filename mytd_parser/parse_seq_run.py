@@ -242,6 +242,7 @@ class MiSeqParser:
          copy metadata dirs and files
         """
         try:
+            api_logger.info('[START] copy_metadata_dirs')
             dirs_df = self.get_dirs(export_csv=True, RTAComplete=True)
             output_dir = self.output_dir
             align_counter = 1
@@ -314,6 +315,7 @@ class MiSeqParser:
                 if num_align_subdir > 1:
                     # if more than 1 align_subdir, add 1 to counter
                     align_counter+=1
+            api_logger.info('[END] copy_metadata_dirs')
             return(dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: copy_metadata_dirs Failed (" + str(err) + ")")
@@ -323,6 +325,7 @@ class MiSeqParser:
          parse fastq metadata dirs
         """
         try:
+            api_logger.info('[START] parse_fastq_metadata_dirs')
             dirs_df = self.copy_metadata_dirs(ignore_dirs=True)
             output_dir = self.output_dir
             for index, row in dirs_df.iterrows():
@@ -379,6 +382,7 @@ class MiSeqParser:
                     dir_count+=1
                 # log info
                 api_logger.info('End copied ' + str(dir_count) + ' dirs')
+            api_logger.info('[END] parse_fastq_metadata_dirs')
             return (dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: parse_fastq_metadata_dirs Failed (" + str(err) + ")")
@@ -388,6 +392,7 @@ class MiSeqParser:
          parse fastq files
         """
         try:
+            api_logger.info('[START] parse_fastq_files')
             dirs_df = self.parse_fastq_metadata_dirs()
             output_dir = self.output_dir
             for index, row in dirs_df.iterrows():
@@ -454,6 +459,7 @@ class MiSeqParser:
                     copy2(summary_file, output_fastq_dir)
                 # log info
                 api_logger.info('End copied ' + str(file_count) + ' files')
+            api_logger.info('[END] parse_fastq_files')
             return(dirs_df)
         except Exception as err:
             raise RuntimeError("** Error: parse_fastq_files Failed (" + str(err) + ")")
@@ -464,7 +470,7 @@ class MiSeqParser:
         """
         try:
             # using subprocess.call method
-            api_logger.info('Start: mydata config settings')
+            api_logger.info('[START] set_mydata_settings_subprocess')
             command = ['python', 'mydata-python/run.py', 'config', 'set', 'data_directory', self.data_directory]
             result_dd = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_dd.returncode) + ']\n stdout: [' + str(result_dd.stdout).replace("\n", ", ") + ']\n stderr: [' + str(result_dd.stderr) + ']')
@@ -478,7 +484,7 @@ class MiSeqParser:
             api_logger.info('subprocess result:\n returncode: [' + str(result_url.returncode) + ']\n stdout: [' + str(result_url.stdout).replace("\n", ", ") + ']\n stderr: [' + str(result_url.stderr) + ']')
 
             api_logger.info('Config updated: ' + str(self.data_directory) + ', ' + str(self.folder_structure) + ', ' + str(self.mytardis_url))
-            api_logger.info('End: mydata config settings')
+            api_logger.info('[END] set_mydata_settings_subprocess')
         except Exception as err:
             raise RuntimeError("** Error: set_mydata_settings Failed (" + str(err) + ")")
 
@@ -487,6 +493,7 @@ class MiSeqParser:
          call mydata through subprocess to scan and upload data
         """
         try:
+            api_logger.info('[START] scan_mydata_subprocess')
             # make sure settings are correct
             self.set_mydata_settings_subprocess()
             # call mydata-python and start folder scan
@@ -494,7 +501,7 @@ class MiSeqParser:
             command = ['python', 'mydata-python/run.py', 'scan', '-v']
             result_scan = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_scan.returncode) + ']\n stdout: [' + str(result_scan.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_scan.stderr) + ']')
-            api_logger.info('End: mydata scan')
+            api_logger.info('[END] scan_mydata_subprocess')
         except Exception as err:
             raise RuntimeError("** Error: scan_mydata_subprocess Failed (" + str(err) + ")")
 
@@ -503,6 +510,7 @@ class MiSeqParser:
          call mydata through subprocess to scan and upload data
         """
         try:
+            api_logger.info('[START] upload_mydata_subprocess')
             # scan folders first
             self.scan_mydata_subprocess()
             # call mydata-python and start upload
@@ -510,7 +518,7 @@ class MiSeqParser:
             command = ['python', 'mydata-python/run.py', 'upload', '-v']
             result_upload = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_upload.returncode) + ']\n stdout: [' + str(result_upload.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_upload.stderr) + ']')
-            api_logger.info('End: mydata upload')
+            api_logger.info('[END] upload_mydata_subprocess')
         except Exception as err:
             raise RuntimeError("** Error: upload_mydata_subprocess Failed (" + str(err) + ")")
 
