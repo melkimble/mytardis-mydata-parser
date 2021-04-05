@@ -663,6 +663,7 @@ class MiSeqParser:
             if upload_parsing:
                 self.upload_mydata_subprocess()
             # with RTAComplete=False, all directories will be placed into backup
+            # But with RTAComplete=True, only complete runs will be processed
             # even if run was not successful
             dirs_df = self.get_dirs(export_csv=False, RTAComplete=True)
             backup_parsed_dir = self.backup_dir+self.backup_parsed_dir_name
