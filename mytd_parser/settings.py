@@ -9,14 +9,14 @@ import os
 #BASE_DIR = os.path.dirname(current_working_dir)
 #BASE_DIR = BASE_DIR.replace('\\', '/')
 
-BASE_DIR = "D:/GitHub/mytardis-mydata-parser"
+BASE_DIR = "D:"
 
 # parse_seq_run.py settings
 MISEQ_STAGING_DIR = BASE_DIR+"/NGS_Outputs/Staging/"
 MISEQ_UPLOAD_DIR = BASE_DIR+"/NGS_Outputs/Upload/"
 MISEQ_BACKUP_DIR = BASE_DIR+"/NGS_Outputs/Backup/"
 
-MISEQ_EXTRA_BACKUP_DIRS = [BASE_DIR+"/NGS_Outputs/Backup2/"]
+MISEQ_EXTRA_BACKUP_DIRS = []
 
 # error logging
 LOG_FILE_DIR = BASE_DIR+'/logs/'

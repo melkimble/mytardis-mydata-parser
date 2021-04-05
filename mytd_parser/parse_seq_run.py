@@ -125,14 +125,14 @@ class MiSeqParser:
         """
         try:
             import xml.etree.ElementTree as ET
-            complete_file_name = 'CompletedJobInfo.xml'
+            complete_file_name = 'RunInfo.xml'
             # grab newest CompletedJobInfo.xml in directory
             complete_file_path = max(glob.glob(f'{input_run_dir}/**/{complete_file_name}', recursive=True))
             complete_file_path = complete_file_path.replace('\\', '/')
             tree = ET.parse(complete_file_path)
             root = tree.getroot()
-            for rid in root.findall('RTARunInfo'):
-                RunID = rid.find('RunID').text
+            for run in root.findall("Run"):
+                RunID = run.get('Id')
             return(RunID)
         except Exception as err:
             raise RuntimeError("** Error: get_run_id_xml Failed (" + str(err) + ")")
@@ -153,6 +153,7 @@ class MiSeqParser:
             run_dirs_create_dates = []
             fastq_dirs_create_dates = []
             align_subdirs_create_dates = []
+            analysis_completes = []
             project_dirs = glob.glob(os.path.join(self.staging_dir, '*/'))
 
             for project_dir in project_dirs:
@@ -173,37 +174,16 @@ class MiSeqParser:
                     # if rta_complete exists, sets variable to True to be filtered on
                     # to only process rta_complete directories
                     rta_complete = self.check_rta_complete(run_dir)
-                    # grab run_id from CompleteJobInfo.xml
+                    # grab run_id from RunInfo.xml
                     run_id = self.get_run_id_xml(run_dir)
-
+                    # run_id = Path(run_dir).name
                     run_dir_create_date = datetime.fromtimestamp(get_creation_dt(run_dir)).strftime('%Y-%m-%d %H:%M:%S')
-                    #run_id = Path(run_dir).name
-                    alignment_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
-                    # convert forward slashes to backwards slashes
-                    alignment_dirs_list = [dir_path.replace('\\', '/') for dir_path in alignment_dirs_list]
-                    # grab filepath with "Alignment" in it
-                    alignment_dir = [algndir for algndir in alignment_dirs_list if "Alignment" in algndir]
-                    # convert list to string
-                    alignment_dir = ''.join(alignment_dir)
-
-                    align_subdirs_list = glob.glob(os.path.join(alignment_dir, '*/'))
-                    # convert forward slashes to backwards slashes
-                    align_subdirs_list = [dir_path.replace('\\', '/') for dir_path in align_subdirs_list]
-                    for align_subdir in align_subdirs_list:
-
-                        align_subdir_create_date = datetime.fromtimestamp(get_creation_dt(align_subdir)).strftime('%Y-%m-%d %H:%M:%S')
-                        num_align_subdir = len(align_subdirs_list)
-                        fastq_dirs_list = glob.glob(os.path.join(align_subdir, '*/'))
-                        # convert forward slashes to backwards slashes
-                        fastq_dirs_list = [dir_path.replace('\\', '/') for dir_path in fastq_dirs_list]
-                        # grab filepath with "Fastq" in it
-                        fastq_dir = [fqdir for fqdir in fastq_dirs_list if "Fastq" in fqdir]
-                        # convert list to string
-                        fastq_dir = ''.join(fastq_dir)
-
-                        fastq_dir_create_date = datetime.fromtimestamp(get_creation_dt(fastq_dir)).strftime('%Y-%m-%d %H:%M:%S')
-                        # grab all other dirs and leave as list
-                        # other_dirs = [fqdir for fqdir in fastq_dirs_list if not "Fastq" in fqdir]
+                    # grab run_id from CompleteJobInfo.xml
+                    if not rta_complete:
+                        # if rta_complete is false, then the run is not complete
+                        align_subdir = align_subdir_create_date = num_align_subdir = fastq_dir = fastq_dir_create_date = "Incomplete Run"
+                        # if incomplete run, then analysis was never complete
+                        analysis_complete = False
 
                         # append to lists
                         projects.append(project)
@@ -217,20 +197,83 @@ class MiSeqParser:
                         fastq_dirs.append(fastq_dir)
                         fastq_dirs_create_dates.append(fastq_dir_create_date)
                         rta_completes.append(rta_complete)
+                        analysis_completes.append(analysis_complete)
+                    else:
+                        alignment_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
+                        # convert forward slashes to backwards slashes
+                        alignment_dirs_list = [dir_path.replace('\\', '/') for dir_path in alignment_dirs_list]
+                        # grab filepath with "Alignment" in it
+                        alignment_dir = [algndir for algndir in alignment_dirs_list if "Alignment" in algndir]
+                        if not alignment_dir:
+                            # if there is no Alignment folder, then the analysis did not complete and there are no Fastq files
+                            # append to lists
+                            align_subdir = align_subdir_create_date = num_align_subdir = fastq_dir = fastq_dir_create_date = "Analysis Incomplete"
+                            # if no alignment folder, then analysis was not complete
+                            analysis_complete = False
+
+                            # append to lists
+                            projects.append(project)
+                            run_ids.append(run_id)
+                            run_dirs.append(run_dir)
+                            run_dirs_create_dates.append(run_dir_create_date)
+                            num_run_dirs.append(num_run_dir)
+                            align_subdirs.append(align_subdir)
+                            align_subdirs_create_dates.append(align_subdir_create_date)
+                            num_align_subdirs.append(num_align_subdir)
+                            fastq_dirs.append(fastq_dir)
+                            fastq_dirs_create_dates.append(fastq_dir_create_date)
+                            rta_completes.append(rta_complete)
+                            analysis_completes.append(analysis_complete)
+                        else:
+                            # convert list to string
+                            alignment_dir = ''.join(alignment_dir)
+                            # there is an analysis folder, then analysis should be complete
+                            analysis_complete = True
+
+                            align_subdirs_list = glob.glob(os.path.join(alignment_dir, '*/'))
+                            # convert forward slashes to backwards slashes
+                            align_subdirs_list = [dir_path.replace('\\', '/') for dir_path in align_subdirs_list]
+                            for align_subdir in align_subdirs_list:
+                                align_subdir_create_date = datetime.fromtimestamp(get_creation_dt(align_subdir)).strftime('%Y-%m-%d %H:%M:%S')
+                                num_align_subdir = len(align_subdirs_list)
+                                fastq_dirs_list = glob.glob(os.path.join(align_subdir, '*/'))
+                                # convert forward slashes to backwards slashes
+                                fastq_dirs_list = [dir_path.replace('\\', '/') for dir_path in fastq_dirs_list]
+                                # grab filepath with "Fastq" in it
+                                fastq_dir = [fqdir for fqdir in fastq_dirs_list if "Fastq" in fqdir]
+                                # convert list to string
+                                fastq_dir = ''.join(fastq_dir)
+
+                                fastq_dir_create_date = datetime.fromtimestamp(get_creation_dt(fastq_dir)).strftime('%Y-%m-%d %H:%M:%S')
+                                # grab all other dirs and leave as list
+                                # other_dirs = [fqdir for fqdir in fastq_dirs_list if not "Fastq" in fqdir]
+
+                                # append to lists
+                                projects.append(project)
+                                run_ids.append(run_id)
+                                run_dirs.append(run_dir)
+                                run_dirs_create_dates.append(run_dir_create_date)
+                                num_run_dirs.append(num_run_dir)
+                                align_subdirs.append(align_subdir)
+                                align_subdirs_create_dates.append(align_subdir_create_date)
+                                num_align_subdirs.append(num_align_subdir)
+                                fastq_dirs.append(fastq_dir)
+                                fastq_dirs_create_dates.append(fastq_dir_create_date)
+                                rta_completes.append(rta_complete)
+                                analysis_completes.append(analysis_complete)
             dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dirs, run_dirs_create_dates, num_run_dirs,
                                             align_subdirs, align_subdirs_create_dates, num_align_subdirs,
-                                            fastq_dirs,fastq_dirs_create_dates,rta_completes)),
+                                            fastq_dirs,fastq_dirs_create_dates,rta_completes, analysis_completes)),
                                    columns=['project', 'run_id', 'run_dir','run_dir_create_date', 'num_run_dir',
                                             'align_subdir', 'align_subdir_create_date', 'num_align_subdir',
-                                            'fastq_dir', 'fastq_dir_create_date', 'rta_complete'])
-
+                                            'fastq_dir', 'fastq_dir_create_date', 'rta_complete', 'analysis_complete'])
             # output dirs to csv
             if export_csv:
                 output_csv_filename = datetime.now().strftime(self.log_file_dir + 'dirlist_%Y%m%d_%H%M%S.csv')
                 dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
             if RTAComplete:
                 # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
-                dirs_df_rta_complete = dirs_df[dirs_df["rta_complete"] == True]
+                dirs_df_rta_complete = dirs_df[(dirs_df["rta_complete"] == True) & (dirs_df["analysis_complete"] == True)]
                 return(dirs_df_rta_complete)
             else:
                 return(dirs_df)
@@ -611,13 +654,14 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: move_staging_backup Failed (" + str(err) + ")")
 
-    def complete_upload_backup(self, move_parsing, move_staging):
+    def complete_upload_backup(self, upload_parsing, move_parsing, move_staging):
         """
          Create MYTDComplete.txt files in parsed and original folders in backup directory
         """
         try:
             api_logger.info('[START] complete_upload_backup')
-            self.upload_mydata_subprocess()
+            if upload_parsing:
+                self.upload_mydata_subprocess()
             # with RTAComplete=False, all directories will be placed into backup
             # even if run was not successful
             dirs_df = self.get_dirs(export_csv=False, RTAComplete=False)
