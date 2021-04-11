@@ -515,15 +515,15 @@ class MiSeqParser:
             # using subprocess.call method
             api_logger.info('[START] set_mydata_settings_subprocess')
             command = ['python', 'mydata-python/run.py', 'config', 'set', 'data_directory', self.data_directory]
-            result_dd = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            result_dd = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, text=True, check=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_dd.returncode) + ']\n stdout: [' + str(result_dd.stdout).replace("\n", ", ") + ']\n stderr: [' + str(result_dd.stderr) + ']')
 
             command = ['python', 'mydata-python/run.py', 'config', 'set', 'folder_structure', self.folder_structure]
-            result_fs = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            result_fs = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, text=True, check=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_fs.returncode) + ']\n stdout: [' + str(result_fs.stdout).replace("\n", ", ") + ']\n stderr: [' + str(result_fs.stderr) + ']')
 
             command = ['python', 'mydata-python/run.py', 'config', 'set', 'mytardis_url', self.mytardis_url]
-            result_url = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            result_url = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, text=True, check=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_url.returncode) + ']\n stdout: [' + str(result_url.stdout).replace("\n", ", ") + ']\n stderr: [' + str(result_url.stderr) + ']')
 
             api_logger.info('Config updated: ' + str(self.data_directory) + ', ' + str(self.folder_structure) + ', ' + str(self.mytardis_url))
@@ -542,7 +542,7 @@ class MiSeqParser:
             # call mydata-python and start folder scan
             api_logger.info('Start: mydata scan')
             command = ['python', 'mydata-python/run.py', 'scan', '-v']
-            result_scan = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            result_scan = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, text=True, check=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_scan.returncode) + ']\n stdout: [' + str(result_scan.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_scan.stderr) + ']')
             api_logger.info('[END] scan_mydata_subprocess')
         except Exception as err:
@@ -559,7 +559,7 @@ class MiSeqParser:
             # call mydata-python and start upload
             api_logger.info('Start: mydata upload')
             command = ['python', 'mydata-python/run.py', 'upload', '-v']
-            result_upload = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True)
+            result_upload = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, text=True, check=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_upload.returncode) + ']\n stdout: [' + str(result_upload.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_upload.stderr) + ']')
             api_logger.info('[END] upload_mydata_subprocess')
         except Exception as err:
