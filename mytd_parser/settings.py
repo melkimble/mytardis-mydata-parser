@@ -4,22 +4,23 @@ Created By: mkimble
 LAST MODIFIED: 03/24/2021
 """
 import os
-
-#current_working_dir = os.getcwd()
-#BASE_DIR = os.path.dirname(current_working_dir)
-#BASE_DIR = BASE_DIR.replace('\\', '/')
-
-BASE_DIR = "D:"
-
-# parse_seq_run.py settings
-MISEQ_STAGING_DIR = BASE_DIR+"/NGS_Outputs/Staging/"
-MISEQ_UPLOAD_DIR = BASE_DIR+"/NGS_Outputs/Upload/"
-MISEQ_BACKUP_DIR = BASE_DIR+"/NGS_Outputs/Backup/"
-
-MISEQ_EXTRA_BACKUP_DIRS = []
+current_working_dir = os.getcwd()
 
 # error logging
-LOG_FILE_DIR = BASE_DIR+'/logs/'
+LOG_BASE_DIR = os.path.dirname(current_working_dir)
+LOG_BASE_DIR = LOG_BASE_DIR.replace('\\', '/')
+LOG_FILE_DIR = LOG_BASE_DIR+'/logs/'
+
+
+MISEQ_BASE_DIR = os.path.dirname(os.path.dirname(current_working_dir))
+MISEQ_BASE_DIR = MISEQ_BASE_DIR.replace('\\', '/')
+
+# parse_seq_run.py settings
+MISEQ_STAGING_DIR = MISEQ_BASE_DIR+"NGS_Outputs/Staging/"
+MISEQ_UPLOAD_DIR = MISEQ_BASE_DIR+"NGS_Outputs/Upload/"
+MISEQ_BACKUP_DIR = MISEQ_BASE_DIR+"NGS_Outputs/Backup/"
+
+MISEQ_EXTRA_BACKUP_DIRS = []
 
 # Mydata cfg
 MISEQ_DATA_DIRECTORY = MISEQ_UPLOAD_DIR

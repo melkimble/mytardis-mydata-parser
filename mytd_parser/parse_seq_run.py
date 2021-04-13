@@ -181,8 +181,8 @@ class MiSeqParser:
                     # grab run_id from CompleteJobInfo.xml
                     if not rta_complete:
                         # if rta_complete is false, then the run is not complete
-                        align_subdir = align_subdir_create_date = num_align_subdir = fastq_dir = fastq_dir_create_date = "Incomplete Run"
-                        # if incomplete run, then analysis was never complete
+                        align_subdir = align_subdir_create_date = num_align_subdir = fastq_dir = fastq_dir_create_date = "Run Failed"
+                        # if Run Failed, then analysis was never complete
                         analysis_complete = False
 
                         # append to lists
@@ -484,14 +484,17 @@ class MiSeqParser:
                     fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
                 # unique subset of sample_ids sorted by name
 
-                sample_ids = sorted(unique(sample_ids))
+                sample_ids_distinct = sorted(unique(sample_ids))
                 file_count = 0
-                for sample_id in sample_ids:
+                fastq_sid_files_list = []
+                for sample_id in sample_ids_distinct:
                     # get filepaths with sampleid in them
                     fastq_sid_df = fastq_df[fastq_df['sample_id'] == sample_id]
                     for index, row in fastq_sid_df.iterrows():
                         fastq_file = row['fastq_path']
                         output_fastq_sid_dir = output_fastq_dir + sample_id + "/"
+                        base_fastq_sid_dir = "/Fastq_"+align_subdir_name + "/" + sample_id + "/"
+                        fastq_sid_files_list.append(base_fastq_sid_dir)
                         if not os.path.exists(output_fastq_sid_dir):
                             os.makedirs(output_fastq_sid_dir)
                             modify_create_date(fastq_dir, output_fastq_sid_dir)
@@ -500,6 +503,12 @@ class MiSeqParser:
                 for summary_file in fastq_summary_file_list:
                     # copy summary file into each fastq sample_id folder
                     copy2(summary_file, output_fastq_dir)
+
+                # add in list of all fastq files for validation server side
+                fastq_sid_df = pd.DataFrame(list(zip(sample_ids, fastq_create_dates, fastq_sid_files_list)), columns=['sample_id', 'fastq_create_date', 'fastq_path'])
+                output_csv_filename = output_fastq_dir+'Fastq_filelist.csv'
+                fastq_sid_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
+
                 # log info
                 api_logger.info('End copied ' + str(file_count) + ' files')
             api_logger.info('[END] parse_fastq_files')
@@ -515,15 +524,15 @@ class MiSeqParser:
             # using subprocess.call method
             api_logger.info('[START] set_mydata_settings_subprocess')
             command = ['python', 'mydata-python/run.py', 'config', 'set', 'data_directory', self.data_directory]
-            result_dd = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, text=True, check=True)
+            result_dd = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, check=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_dd.returncode) + ']\n stdout: [' + str(result_dd.stdout).replace("\n", ", ") + ']\n stderr: [' + str(result_dd.stderr) + ']')
 
             command = ['python', 'mydata-python/run.py', 'config', 'set', 'folder_structure', self.folder_structure]
-            result_fs = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, text=True, check=True)
+            result_fs = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, check=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_fs.returncode) + ']\n stdout: [' + str(result_fs.stdout).replace("\n", ", ") + ']\n stderr: [' + str(result_fs.stderr) + ']')
 
             command = ['python', 'mydata-python/run.py', 'config', 'set', 'mytardis_url', self.mytardis_url]
-            result_url = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, text=True, check=True)
+            result_url = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, check=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_url.returncode) + ']\n stdout: [' + str(result_url.stdout).replace("\n", ", ") + ']\n stderr: [' + str(result_url.stderr) + ']')
 
             api_logger.info('Config updated: ' + str(self.data_directory) + ', ' + str(self.folder_structure) + ', ' + str(self.mytardis_url))
@@ -542,7 +551,7 @@ class MiSeqParser:
             # call mydata-python and start folder scan
             api_logger.info('Start: mydata scan')
             command = ['python', 'mydata-python/run.py', 'scan', '-v']
-            result_scan = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, text=True, check=True)
+            result_scan = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, check=True)
             api_logger.info('subprocess result:\n returncode: [' + str(result_scan.returncode) + ']\n stdout: [' + str(result_scan.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_scan.stderr) + ']')
             api_logger.info('[END] scan_mydata_subprocess')
         except Exception as err:
@@ -559,20 +568,21 @@ class MiSeqParser:
             # call mydata-python and start upload
             api_logger.info('Start: mydata upload')
             command = ['python', 'mydata-python/run.py', 'upload', '-v']
-            result_upload = run(command, stdout=PIPE, stderr=PIPE, universal_newlines=True, text=True, check=True)
-            api_logger.info('subprocess result:\n returncode: [' + str(result_upload.returncode) + ']\n stdout: [' + str(result_upload.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_upload.stderr) + ']')
+            run(command)
+            # result_upload = run(command, check=True)
+            #api_logger.info('subprocess result:\n returncode: [' + str(result_upload.returncode) + ']\n stdout: [' + str(result_upload.stdout).replace("\n",", ") + ']\n stderr: [' + str(result_upload.stderr) + ']')
             api_logger.info('[END] upload_mydata_subprocess')
         except Exception as err:
             raise RuntimeError("** Error: upload_mydata_subprocess Failed (" + str(err) + ")")
 
     def create_mytd_complete(self, input_dir, mytd_dir, project, run_id):
-        mytd_filepath = mytd_dir + "MYTDComplete.txt"
+        mytd_filepath = input_dir + "MYTDComplete.txt"
         with open(mytd_filepath, mode='a') as file:
             file.write(
                 '[START]\n mytd_parser completed at [%s]\n Project: %s\n RunID: %s\n Backup copied from: [%s]\n Backup copied to: [%s]\n[END]' %
                 (datetime.now(), project, run_id, input_dir, mytd_dir))
 
-    def move_parsing_backup(self, dirs_df):
+    def move_parsing_backup(self, dirs_df, upload_parsing):
         """
          move parsed files from upload to backup; must happen after mydata upload is complete
          extra_backup_dirs: expects extra backup dirs
@@ -606,19 +616,33 @@ class MiSeqParser:
                             copy_tree(input_copy_dir, output_backup_dir)
                             api_logger.info('End: backup copy')
                             # generate MYTDComplete.txt in each backup folder
-                            self.create_mytd_complete(input_copy_dir, output_backup_dir, project, run_id)
+                            self.create_mytd_complete(output_backup_dir, input_copy_dir, project, run_id)
                     # when copy complete if there are extra backup dirs, move to final backup directory
                     api_logger.info('Start: backup move - from: [' + input_copy_dir + '], to: [' + output_move_dir + ']')
-                    move(input_copy_dir, output_move_dir)
-                    # generate MYTDComplete.txt in final backup location
-                    self.create_mytd_complete(input_copy_dir, output_move_dir, project, run_id)
+
+                    if upload_parsing:
+                        # After copy is complete of extra backup dirs, move original data to backup location
+                        move(input_copy_dir, output_move_dir)
+                        # upload MYTDComplete.txt via mydata. Need it to upload last if uploading.
+                        # generate MYTDComplete.txt in final backup location
+                        if not os.path.exists(input_copy_dir):
+                            os.makedirs(input_copy_dir)
+                        self.create_mytd_complete(input_copy_dir, output_move_dir, project, run_id)
+                        self.upload_mydata_subprocess()
+                        # move MYTDComplete back to backup folders
+                        move(input_copy_dir, output_move_dir)
+                    else:
+                        self.create_mytd_complete(input_copy_dir, output_move_dir, project, run_id)
+                        # when copy complete if there are extra backup dirs, move to final backup directory
+                        move(input_copy_dir, output_move_dir)
+
                     api_logger.info('End: parse backup moved')
             api_logger.info('[END] move_parsing_backup')
             return (dirs_group_df)
         except Exception as err:
             raise RuntimeError("** Error: move_parsing_backup Failed (" + str(err) + ")")
 
-    def move_staging_backup(self, dirs_df):
+    def move_staging_backup(self, dirs_df, upload_parsing):
         """
          move data out of staging folder and to backup folder; must happen after parsing is complete
          extra_backup_dirs: expects list of directories
@@ -634,8 +658,8 @@ class MiSeqParser:
                 project = row['project']
                 run_id = row['run_id']
                 input_copy_dir = staging_dir + project + "/" + run_id + "/"
-                output_copy_dir = backup_original_dir + project + "/" + run_id + "/"
-                api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_copy_dir+']')
+                output_move_dir = backup_original_dir + project + "/" + run_id + "/"
+                api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_move_dir+']')
                 if extra_backup_dirs:
                     for extra_backup_dir in extra_backup_dirs:
                         # copy into each extra backup directory
@@ -644,11 +668,23 @@ class MiSeqParser:
                         copy_tree(input_copy_dir, output_backup_dir)
                         api_logger.info('End: backup copy')
                         # generate MYTDComplete.txt in each backup folder
-                        self.create_mytd_complete(input_copy_dir, output_backup_dir, project, run_id)
-                # when copy complete if there are extra backup dirs, move to final backup directory
-                move(input_copy_dir, output_copy_dir)
-                # generate MYTDComplete.txt in final backup location
-                self.create_mytd_complete(input_copy_dir, output_copy_dir, project, run_id)
+                        self.create_mytd_complete(output_backup_dir, input_copy_dir, project, run_id)
+                if upload_parsing:
+                    # After copy is complete of extra backup dirs, move parsed data to backup location
+                    move(input_copy_dir, output_move_dir)
+                    # upload MYTDComplete.txt via mydata. Need it to upload last if uploading.
+                    # generate MYTDComplete.txt in final backup location
+                    if not os.path.exists(input_copy_dir):
+                        os.makedirs(input_copy_dir)
+                    self.create_mytd_complete(input_copy_dir, output_move_dir, project, run_id)
+                    self.upload_mydata_subprocess()
+                    # move MYTDComplete back to backup folders
+                    move(input_copy_dir, output_move_dir)
+                else:
+                    self.create_mytd_complete(input_copy_dir, output_move_dir, project, run_id)
+                    # when copy complete if there are extra backup dirs, move to final backup directory
+                    move(input_copy_dir, output_move_dir)
+
                 api_logger.info('End: backup moved')
             api_logger.info('[END] move_staging_backup')
         except Exception as err:
@@ -669,14 +705,14 @@ class MiSeqParser:
             backup_parsed_dir = self.backup_dir+self.backup_parsed_dir_name
             backup_original_dir = self.backup_dir+self.backup_original_dir_name
             if move_parsing and move_staging:
-                self.move_parsing_backup(dirs_df)
-                self.move_staging_backup(dirs_df)
+                self.move_parsing_backup(dirs_df, upload_parsing)
+                self.move_staging_backup(dirs_df, upload_parsing)
                 api_logger.info('Backup made of parsed and original ['+backup_parsed_dir+', '+backup_original_dir+']')
             elif move_parsing and not move_staging:
-                self.move_parsing_backup(dirs_df)
+                self.move_parsing_backup(dirs_df, upload_parsing)
                 api_logger.info('Backup made of parsed ['+backup_parsed_dir+']')
             elif not move_parsing and move_staging:
-                self.move_staging_backup(dirs_df)
+                self.move_staging_backup(dirs_df, upload_parsing)
                 api_logger.info('Backup made of original ['+backup_original_dir+']')
             elif not move_parsing and not move_staging:
                 api_logger.info('No backup created ['+backup_parsed_dir+', '+backup_original_dir+']')

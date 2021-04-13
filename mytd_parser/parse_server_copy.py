@@ -18,10 +18,12 @@ from mytd_parser.parse_seq_run import MiSeqParser
 class ServerParse(MiSeqParser):
     def __init__(self,staging_dir=settings.SERVER_STAGING_DIR,
                  output_dir=settings.SERVER_OUTPUT_DIR,
-                 data_directory=settings.SERVER_DATA_DIRECTORY):
+                 data_directory=settings.SERVER_DATA_DIRECTORY,
+                 log_file_dir=settings.LOG_FILE_DIR):
         super().__init__(staging_dir, output_dir, data_directory)
         self.staging_dir = staging_dir
         self.output_dir = output_dir
+        self.log_file_dir = log_file_dir
         # mydata cfgs
         self.data_directory = data_directory
         print(self.staging_dir)
