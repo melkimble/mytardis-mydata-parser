@@ -124,4 +124,3 @@ dmypy.json
 #mydata-python git repo
 /mydata-python/*
 /logs/*
-/mydata-python/

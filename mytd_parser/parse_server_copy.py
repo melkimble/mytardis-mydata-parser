@@ -35,15 +35,13 @@ class ServerParse(MiSeqParser):
         try:
             run_ids = []
             run_dirs = []
-           # align_subdirs = []
             fastq_dirs = []
             projects = []
-            #num_align_subdirs = []
+            num_fastq_dirs = []
             rta_completes = []
             num_run_dirs = []
             run_dirs_create_dates = []
             fastq_dirs_create_dates = []
-            #align_subdirs_create_dates = []
             analysis_completes = []
             # make list of all project folders; e.g., maine-edna
             project_dirs = glob.glob(os.path.join(self.staging_dir, '*/'))
@@ -71,7 +69,7 @@ class ServerParse(MiSeqParser):
                     run_dir_create_date = datetime.fromtimestamp(get_creation_dt(run_dir)).strftime('%Y-%m-%d %H:%M:%S')
                     if not rta_complete:
                         # if rta_complete is false, then the run is not complete
-                        fastq_dir = fastq_dir_create_date = "Run Failed"
+                        fastq_dir = fastq_dir_create_date = num_fastq_dirs = "Run Failed"
                         # if Run Failed, then analysis was never complete
                         analysis_complete = False
 
@@ -81,10 +79,9 @@ class ServerParse(MiSeqParser):
                         run_dirs.append(run_dir)
                         run_dirs_create_dates.append(run_dir_create_date)
                         num_run_dirs.append(num_run_dir)
-
                         fastq_dirs.append(fastq_dir)
                         fastq_dirs_create_dates.append(fastq_dir_create_date)
-
+                        num_fastq_dirs.append(num_fastq_dirs)
                         rta_completes.append(rta_complete)
                         analysis_completes.append(analysis_complete)
                     else:
@@ -96,7 +93,7 @@ class ServerParse(MiSeqParser):
                         if not fastq_dirs_list:
                             # if there are no fastq folders
                             # append to lists
-                            align_subdir = align_subdir_create_date = fastq_dir = fastq_dir_create_date = "Analysis Incomplete"
+                            fastq_dir = fastq_dir_create_date = num_fastq_dirs = "Analysis Incomplete"
                             # if no alignment folder, then analysis was not complete
                             analysis_complete = False
 
@@ -106,35 +103,30 @@ class ServerParse(MiSeqParser):
                             run_dirs.append(run_dir)
                             run_dirs_create_dates.append(run_dir_create_date)
                             num_run_dirs.append(num_run_dir)
-
                             fastq_dirs.append(fastq_dir)
                             fastq_dirs_create_dates.append(fastq_dir_create_date)
+                            num_fastq_dirs.append(num_fastq_dirs)
                             rta_completes.append(rta_complete)
                             analysis_completes.append(analysis_complete)
                         else:
                             # fastq files and RTACompete exist, so proceed
+                            num_fastq_dirs = len(fastq_dirs_list)
                             for fastq_dir in fastq_dirs_list:
-                                num_align_subdir = len(fastq_dirs_list)
-
                                 # append to lists
                                 projects.append(project)
                                 run_ids.append(run_id)
                                 run_dirs.append(run_dir)
                                 run_dirs_create_dates.append(run_dir_create_date)
                                 num_run_dirs.append(num_run_dir)
-                                align_subdirs.append(align_subdir)
-                                align_subdirs_create_dates.append(align_subdir_create_date)
-                                num_align_subdirs.append(num_align_subdir)
                                 fastq_dirs.append(fastq_dir)
                                 fastq_dirs_create_dates.append(fastq_dir_create_date)
+                                num_fastq_dirs.append(num_fastq_dirs)
                                 rta_completes.append(rta_complete)
                                 analysis_completes.append(analysis_complete)
             dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dirs, run_dirs_create_dates, num_run_dirs,
-                                            align_subdirs, align_subdirs_create_dates, num_align_subdirs,
-                                            fastq_dirs,fastq_dirs_create_dates,rta_completes, analysis_completes)),
+                                             fastq_dirs, fastq_dirs_create_dates, num_fastq_dirs, rta_completes, analysis_completes)),
                                    columns=['project', 'run_id', 'run_dir','run_dir_create_date', 'num_run_dir',
-                                            'align_subdir', 'align_subdir_create_date', 'num_align_subdir',
-                                            'fastq_dir', 'fastq_dir_create_date', 'rta_complete', 'analysis_complete'])
+                                            'fastq_dir', 'fastq_dir_create_date', 'num_fastq_dir', 'rta_complete', 'analysis_complete'])
             # output dirs to csv
             if export_csv:
                 output_csv_filename = datetime.now().strftime(self.log_file_dir + 'dirlist_%Y%m%d_%H%M%S.csv')
