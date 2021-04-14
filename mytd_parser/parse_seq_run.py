@@ -486,15 +486,16 @@ class MiSeqParser:
 
                 sample_ids_distinct = sorted(unique(sample_ids))
                 file_count = 0
-                fastq_sid_files_list = []
+                fastq_sid_fileslist = []
                 for sample_id in sample_ids_distinct:
                     # get filepaths with sampleid in them
                     fastq_sid_df = fastq_df[fastq_df['sample_id'] == sample_id]
                     for index, row in fastq_sid_df.iterrows():
                         fastq_file = row['fastq_path']
                         output_fastq_sid_dir = output_fastq_dir + sample_id + "/"
-                        base_fastq_sid_dir = "/Fastq_"+align_subdir_name + "/" + sample_id + "/"
-                        fastq_sid_files_list.append(base_fastq_sid_dir)
+                        fastq_filename = os.path.basename(fastq_file)
+                        base_fastq_filelist = "/Fastq_"+align_subdir_name + "/" + sample_id + "/" + fastq_filename
+                        fastq_sid_fileslist.append(base_fastq_filelist)
                         if not os.path.exists(output_fastq_sid_dir):
                             os.makedirs(output_fastq_sid_dir)
                             modify_create_date(fastq_dir, output_fastq_sid_dir)
@@ -505,7 +506,7 @@ class MiSeqParser:
                     copy2(summary_file, output_fastq_dir)
 
                 # add in list of all fastq files for validation server side
-                fastq_sid_df = pd.DataFrame(list(zip(sample_ids, fastq_create_dates, fastq_sid_files_list)), columns=['sample_id', 'fastq_create_date', 'fastq_path'])
+                fastq_sid_df = pd.DataFrame(list(zip(sample_ids, fastq_create_dates, fastq_sid_fileslist)), columns=['sample_id', 'fastq_create_date', 'fastq_path'])
                 output_csv_filename = output_fastq_dir+'Fastq_filelist.csv'
                 fastq_sid_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
 

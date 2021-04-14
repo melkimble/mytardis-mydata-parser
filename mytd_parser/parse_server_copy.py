@@ -28,7 +28,20 @@ class ServerParse(MiSeqParser):
         self.data_directory = data_directory
         print(self.staging_dir)
 
-    def get_dirs(self, export_csv=True, RTAComplete=True):
+    def check_upload_complete(self, fastq_list_filepath, run_dir):
+        fastq_list_df = pd.read_csv(fastq_list_filepath)
+
+        fastq_list = fastq_list_df['fastq_path'].tolist()
+        complete_fastq_list = [s + run_dir for s in fastq_list]
+
+        if all(list(map(os.path.isfile, complete_fastq_list))):
+            # all files exist, so upload is complete
+            return True
+        else:
+            # some files missing, so upload is not complete
+            return False
+
+    def get_dirs(self, export_csv=True, upload_complete=True):
         """
          get dirs and put in pandas df
         """
@@ -43,6 +56,7 @@ class ServerParse(MiSeqParser):
             run_dirs_create_dates = []
             fastq_dirs_create_dates = []
             analysis_completes = []
+            upload_completes = []
             # make list of all project folders; e.g., maine-edna
             project_dirs = glob.glob(os.path.join(self.staging_dir, '*/'))
             for project_dir in project_dirs:
@@ -57,7 +71,7 @@ class ServerParse(MiSeqParser):
                 # make list of all sequencing run folders in project directories
                 run_dir_list = glob.glob(os.path.join(project_dir, '*/'))
                 run_dir_list = [dir_path.replace('\\', '/') for dir_path in run_dir_list]
-                # loop through all squencing run folders
+                # loop through all sequencing run folders
                 for run_dir in run_dir_list:
                     # the number of sequencing runs per project
                     num_run_dir = len(run_dir_list)
@@ -72,6 +86,7 @@ class ServerParse(MiSeqParser):
                         fastq_dir = fastq_dir_create_date = num_fastq_dirs = "Run Failed"
                         # if Run Failed, then analysis was never complete
                         analysis_complete = False
+                        upload_complete = False
 
                         # append to lists
                         projects.append(project)
@@ -84,6 +99,7 @@ class ServerParse(MiSeqParser):
                         num_fastq_dirs.append(num_fastq_dirs)
                         rta_completes.append(rta_complete)
                         analysis_completes.append(analysis_complete)
+                        upload_completes.append(upload_complete)
                     else:
                         fastq_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
                         # convert forward slashes to backwards slashes
@@ -96,6 +112,7 @@ class ServerParse(MiSeqParser):
                             fastq_dir = fastq_dir_create_date = num_fastq_dirs = "Analysis Incomplete"
                             # if no alignment folder, then analysis was not complete
                             analysis_complete = False
+                            upload_complete = False
 
                             # append to lists
                             projects.append(project)
@@ -108,9 +125,13 @@ class ServerParse(MiSeqParser):
                             num_fastq_dirs.append(num_fastq_dirs)
                             rta_completes.append(rta_complete)
                             analysis_completes.append(analysis_complete)
+                            upload_completes.append(upload_complete)
                         else:
                             # fastq files and RTACompete exist, so proceed
                             num_fastq_dirs = len(fastq_dirs_list)
+                            fastq_list_filepath = fastq_dir + 'Fastq_filelist.csv'
+                            upload_complete = self.check_upload_complete(fastq_list_filepath, run_dir)
+
                             for fastq_dir in fastq_dirs_list:
                                 # append to lists
                                 projects.append(project)
@@ -123,18 +144,21 @@ class ServerParse(MiSeqParser):
                                 num_fastq_dirs.append(num_fastq_dirs)
                                 rta_completes.append(rta_complete)
                                 analysis_completes.append(analysis_complete)
+                                upload_completes.append(upload_complete)
             dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dirs, run_dirs_create_dates, num_run_dirs,
-                                             fastq_dirs, fastq_dirs_create_dates, num_fastq_dirs, rta_completes, analysis_completes)),
+                                             fastq_dirs, fastq_dirs_create_dates, num_fastq_dirs, rta_completes,
+                                            analysis_completes, upload_completes)),
                                    columns=['project', 'run_id', 'run_dir','run_dir_create_date', 'num_run_dir',
-                                            'fastq_dir', 'fastq_dir_create_date', 'num_fastq_dir', 'rta_complete', 'analysis_complete'])
+                                            'fastq_dir', 'fastq_dir_create_date', 'num_fastq_dir', 'rta_complete',
+                                            'analysis_complete', 'upload_complete'])
             # output dirs to csv
             if export_csv:
                 output_csv_filename = datetime.now().strftime(self.log_file_dir + 'dirlist_%Y%m%d_%H%M%S.csv')
                 dirs_df.to_csv(output_csv_filename, encoding='utf-8')
-            if RTAComplete:
+            if upload_complete:
                 # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
-                dirs_df_rta_complete = dirs_df[dirs_df["rta_complete"] == True]
-                return(dirs_df_rta_complete)
+                dirs_df_upload_complete = dirs_df[(dirs_df["rta_complete"] == True) & (dirs_df["upload_complete"] == True)]
+                return(dirs_df_upload_complete)
             else:
                 return(dirs_df)
         except Exception as err:
@@ -147,7 +171,7 @@ class ServerParse(MiSeqParser):
         try:
             api_logger.info('[START] move_fastq_files')
             output_dir = self.output_dir
-            dirs_df = self.get_dirs(export_csv=True, RTAComplete=True)
+            dirs_df = self.get_dirs(export_csv=True, upload_complete=True)
             for index, row in dirs_df.iterrows():
                 project = row['project']
                 run_id = row['run_id']
