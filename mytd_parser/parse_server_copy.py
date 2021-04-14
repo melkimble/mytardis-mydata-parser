@@ -135,23 +135,44 @@ class ServerParse(MiSeqParser):
                             num_fastq_dir = len(fastq_dirs_list)
                             for fastq_dir in fastq_dirs_list:
                                 fastq_list_filepath = fastq_dir + 'Fastq_filelist.csv'
-                                # check if all fastq files have been uploaded via rclone
-                                upload_complete = self.check_upload_complete(fastq_list_filepath, run_dir)
-                                # grab date of fastq dir
-                                fastq_dir_create_date = datetime.fromtimestamp(get_creation_dt(fastq_dir)).strftime('%Y-%m-%d %H:%M:%S')
-                                analysis_complete = True
-                                # append to lists
-                                projects.append(project)
-                                run_ids.append(run_id)
-                                run_dirs.append(run_dir)
-                                run_dirs_create_dates.append(run_dir_create_date)
-                                num_run_dirs.append(num_run_dir)
-                                fastq_dirs.append(fastq_dir)
-                                fastq_dirs_create_dates.append(fastq_dir_create_date)
-                                num_fastq_dirs.append(num_fastq_dir)
-                                rta_completes.append(rta_complete)
-                                analysis_completes.append(analysis_complete)
-                                upload_completes.append(upload_complete)
+                                fastq_list_exists = os.path.exists(fastq_list_filepath)
+                                if not fastq_list_exists:
+                                    # check if all fastq files have been uploaded via rclone
+                                    upload_complete = False
+                                    # grab date of fastq dir
+                                    fastq_dir_create_date = datetime.fromtimestamp(get_creation_dt(fastq_dir)).strftime('%Y-%m-%d %H:%M:%S')
+                                    analysis_complete = True
+                                    # append to lists
+                                    projects.append(project)
+                                    run_ids.append(run_id)
+                                    run_dirs.append(run_dir)
+                                    run_dirs_create_dates.append(run_dir_create_date)
+                                    num_run_dirs.append(num_run_dir)
+                                    fastq_dirs.append(fastq_dir)
+                                    fastq_dirs_create_dates.append(fastq_dir_create_date)
+                                    num_fastq_dirs.append(num_fastq_dir)
+                                    rta_completes.append(rta_complete)
+                                    analysis_completes.append(analysis_complete)
+                                    upload_completes.append(upload_complete)
+                                else:
+                                    # check if all fastq files have been uploaded via rclone
+                                    upload_complete = self.check_upload_complete(fastq_list_filepath, run_dir)
+                                    # grab date of fastq dir
+                                    fastq_dir_create_date = datetime.fromtimestamp(get_creation_dt(fastq_dir)).strftime('%Y-%m-%d %H:%M:%S')
+                                    analysis_complete = True
+                                    # append to lists
+                                    projects.append(project)
+                                    run_ids.append(run_id)
+                                    run_dirs.append(run_dir)
+                                    run_dirs_create_dates.append(run_dir_create_date)
+                                    num_run_dirs.append(num_run_dir)
+                                    fastq_dirs.append(fastq_dir)
+                                    fastq_dirs_create_dates.append(fastq_dir_create_date)
+                                    num_fastq_dirs.append(num_fastq_dir)
+                                    rta_completes.append(rta_complete)
+                                    analysis_completes.append(analysis_complete)
+                                    upload_completes.append(upload_complete)
+
             dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dirs, run_dirs_create_dates, num_run_dirs,
                                              fastq_dirs, fastq_dirs_create_dates, num_fastq_dirs, rta_completes,
                                             analysis_completes, upload_completes)),
