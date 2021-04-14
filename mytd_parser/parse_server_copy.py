@@ -221,7 +221,7 @@ class ServerParse(MiSeqParser):
                         fastq_counter += 1
                     else:
                         api_logger.info(str(fastq_filename)+' already in ['+str(output_fastq_dir)+']')
-                    api_logger.info('End: moved ' + str(fastq_counter) + ' files')
+                api_logger.info('End: moved ' + str(fastq_counter) + ' files')
 
             api_logger.info('[END] move_fastq_files')
         except Exception as err:
