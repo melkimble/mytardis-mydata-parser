@@ -212,7 +212,11 @@ class ServerParse(MiSeqParser):
                 api_logger.info('Start move: '+project+', '+run_id+', '+str(num_fastq_files)+' files from: [' + fastq_dir + '], to: [' + output_fastq_dir + ']')
                 fastq_counter=0
                 for fastq_file in fastq_files:
-                    copy2(fastq_file, output_fastq_dir)
+                    fastq_filename = os.path.basename(fastq_file)
+                    output_fastq_filename = output_fastq_dir+fastq_filename
+                    if not os.path.exists(output_fastq_filename):
+                        # only want to copy/move if file doesn't already exist
+                        copy2(fastq_file, output_fastq_dir)
                     fastq_counter+=1
                 api_logger.info('End: moved '+str(fastq_counter)+' files')
             api_logger.info('[END] move_fastq_files')
