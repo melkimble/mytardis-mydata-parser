@@ -18,4 +18,4 @@ miseq_parser = MiSeqParser()
 miseq_parser.parse_fastq_files()
 
 # Read parsed runs in /Upload directory, upload to MyData, and move parsed files and original files to /Backup directory
-miseq_parser.complete_upload_backup(upload_parsing=False, move_parsing=False, move_staging=True)
+miseq_parser.complete_upload_backup(upload_parsing=False, move_parsing=False, move_staging=False)

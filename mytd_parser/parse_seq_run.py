@@ -269,11 +269,11 @@ class MiSeqParser:
                                             'fastq_dir', 'fastq_dir_create_date', 'rta_complete', 'analysis_complete'])
             # output dirs to csv
             if export_csv:
-                output_csv_filename = datetime.now().strftime(self.log_file_dir + 'dirlist_%Y%m%d_%H%M%S.csv')
+                output_csv_filename = datetime.now().strftime(self.log_file_dir + 'miseq_dirlist_%Y%m%d_%H%M%S.csv')
                 dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
             if RTAComplete:
                 # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
-                dirs_df_rta_complete = dirs_df[(dirs_df["rta_complete"] == True) & (dirs_df["analysis_complete"] == True)]
+                dirs_df_rta_complete = dirs_df[(dirs_df['rta_complete'] == True) & (dirs_df['analysis_complete'] == True)]
                 return(dirs_df_rta_complete)
             else:
                 return(dirs_df)
@@ -494,7 +494,7 @@ class MiSeqParser:
                         fastq_file = row['fastq_path']
                         output_fastq_sid_dir = output_fastq_dir + sample_id + "/"
                         fastq_filename = os.path.basename(fastq_file)
-                        base_fastq_filelist = "/Fastq_"+align_subdir_name + "/" + sample_id + "/" + fastq_filename
+                        base_fastq_filelist = "Fastq_"+align_subdir_name + "/" + sample_id + "/" + fastq_filename
                         fastq_sid_fileslist.append(base_fastq_filelist)
                         if not os.path.exists(output_fastq_sid_dir):
                             os.makedirs(output_fastq_sid_dir)

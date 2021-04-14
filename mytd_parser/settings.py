@@ -7,10 +7,8 @@ import os
 current_working_dir = os.getcwd()
 
 # error logging
-LOG_BASE_DIR = os.path.dirname(current_working_dir)
-LOG_BASE_DIR = LOG_BASE_DIR.replace('\\', '/')
+LOG_BASE_DIR = current_working_dir.replace('\\', '/')
 LOG_FILE_DIR = LOG_BASE_DIR+'/logs/'
-
 
 MISEQ_BASE_DIR = os.path.dirname(os.path.dirname(current_working_dir))
 MISEQ_BASE_DIR = MISEQ_BASE_DIR.replace('\\', '/')

@@ -29,19 +29,23 @@ class ServerParse(MiSeqParser):
         print(self.staging_dir)
 
     def check_upload_complete(self, fastq_list_filepath, run_dir):
+        api_logger.info('[START] check_upload_complete')
         fastq_list_df = pd.read_csv(fastq_list_filepath)
 
         fastq_list = fastq_list_df['fastq_path'].tolist()
-        complete_fastq_list = [s + run_dir for s in fastq_list]
+        complete_fastq_list = [run_dir + s for s in fastq_list]
+        api_logger.info(complete_fastq_list)
 
         if all(list(map(os.path.isfile, complete_fastq_list))):
+            api_logger.info('[END] check_upload_complete - True')
             # all files exist, so upload is complete
             return True
         else:
+            api_logger.info('[END] check_upload_complete - False')
             # some files missing, so upload is not complete
             return False
 
-    def get_dirs(self, export_csv=True, upload_complete=True):
+    def get_dirs(self, export_csv=True, complete_upload=True):
         """
          get dirs and put in pandas df
         """
@@ -83,7 +87,7 @@ class ServerParse(MiSeqParser):
                     run_dir_create_date = datetime.fromtimestamp(get_creation_dt(run_dir)).strftime('%Y-%m-%d %H:%M:%S')
                     if not rta_complete:
                         # if rta_complete is false, then the run is not complete
-                        fastq_dir = fastq_dir_create_date = num_fastq_dirs = "Run Failed"
+                        fastq_dir = fastq_dir_create_date = num_fastq_dir = "Run Failed"
                         # if Run Failed, then analysis was never complete
                         analysis_complete = False
                         upload_complete = False
@@ -96,7 +100,7 @@ class ServerParse(MiSeqParser):
                         num_run_dirs.append(num_run_dir)
                         fastq_dirs.append(fastq_dir)
                         fastq_dirs_create_dates.append(fastq_dir_create_date)
-                        num_fastq_dirs.append(num_fastq_dirs)
+                        num_fastq_dirs.append(num_fastq_dir)
                         rta_completes.append(rta_complete)
                         analysis_completes.append(analysis_complete)
                         upload_completes.append(upload_complete)
@@ -109,7 +113,7 @@ class ServerParse(MiSeqParser):
                         if not fastq_dirs_list:
                             # if there are no fastq folders
                             # append to lists
-                            fastq_dir = fastq_dir_create_date = num_fastq_dirs = "Analysis Incomplete"
+                            fastq_dir = fastq_dir_create_date = num_fastq_dir = "Analysis Incomplete"
                             # if no alignment folder, then analysis was not complete
                             analysis_complete = False
                             upload_complete = False
@@ -122,17 +126,20 @@ class ServerParse(MiSeqParser):
                             num_run_dirs.append(num_run_dir)
                             fastq_dirs.append(fastq_dir)
                             fastq_dirs_create_dates.append(fastq_dir_create_date)
-                            num_fastq_dirs.append(num_fastq_dirs)
+                            num_fastq_dirs.append(num_fastq_dir)
                             rta_completes.append(rta_complete)
                             analysis_completes.append(analysis_complete)
                             upload_completes.append(upload_complete)
                         else:
                             # fastq files and RTACompete exist, so proceed
-                            num_fastq_dirs = len(fastq_dirs_list)
-                            fastq_list_filepath = fastq_dir + 'Fastq_filelist.csv'
-                            upload_complete = self.check_upload_complete(fastq_list_filepath, run_dir)
-
+                            num_fastq_dir = len(fastq_dirs_list)
                             for fastq_dir in fastq_dirs_list:
+                                fastq_list_filepath = fastq_dir + 'Fastq_filelist.csv'
+                                # check if all fastq files have been uploaded via rclone
+                                upload_complete = self.check_upload_complete(fastq_list_filepath, run_dir)
+                                # grab date of fastq dir
+                                fastq_dir_create_date = datetime.fromtimestamp(get_creation_dt(fastq_dir)).strftime('%Y-%m-%d %H:%M:%S')
+                                analysis_complete = True
                                 # append to lists
                                 projects.append(project)
                                 run_ids.append(run_id)
@@ -141,7 +148,7 @@ class ServerParse(MiSeqParser):
                                 num_run_dirs.append(num_run_dir)
                                 fastq_dirs.append(fastq_dir)
                                 fastq_dirs_create_dates.append(fastq_dir_create_date)
-                                num_fastq_dirs.append(num_fastq_dirs)
+                                num_fastq_dirs.append(num_fastq_dir)
                                 rta_completes.append(rta_complete)
                                 analysis_completes.append(analysis_complete)
                                 upload_completes.append(upload_complete)
@@ -153,11 +160,11 @@ class ServerParse(MiSeqParser):
                                             'analysis_complete', 'upload_complete'])
             # output dirs to csv
             if export_csv:
-                output_csv_filename = datetime.now().strftime(self.log_file_dir + 'dirlist_%Y%m%d_%H%M%S.csv')
-                dirs_df.to_csv(output_csv_filename, encoding='utf-8')
-            if upload_complete:
+                output_csv_filename = datetime.now().strftime(self.log_file_dir + 'server_dirlist_%Y%m%d_%H%M%S.csv')
+                dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
+            if complete_upload:
                 # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
-                dirs_df_upload_complete = dirs_df[(dirs_df["rta_complete"] == True) & (dirs_df["upload_complete"] == True)]
+                dirs_df_upload_complete = dirs_df[(dirs_df['rta_complete'] == True) & (dirs_df['upload_complete'] == True)]
                 return(dirs_df_upload_complete)
             else:
                 return(dirs_df)
@@ -171,7 +178,7 @@ class ServerParse(MiSeqParser):
         try:
             api_logger.info('[START] move_fastq_files')
             output_dir = self.output_dir
-            dirs_df = self.get_dirs(export_csv=True, upload_complete=True)
+            dirs_df = self.get_dirs(export_csv=True, complete_upload=True)
             for index, row in dirs_df.iterrows():
                 project = row['project']
                 run_id = row['run_id']
