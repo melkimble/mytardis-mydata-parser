@@ -127,13 +127,17 @@ class MiSeqParser:
             import xml.etree.ElementTree as ET
             complete_file_name = 'RunInfo.xml'
             # grab newest CompletedJobInfo.xml in directory
-            complete_file_path = max(glob.glob(f'{input_run_dir}/**/{complete_file_name}', recursive=True))
-            complete_file_path = complete_file_path.replace('\\', '/')
-            tree = ET.parse(complete_file_path)
-            root = tree.getroot()
-            for run in root.findall("Run"):
-                RunID = run.get('Id')
-            return(RunID)
+            complete_file_path = glob.glob(f'{input_run_dir}/**/{complete_file_name}', recursive=True)
+            if complete_file_path:
+                complete_file_path = max(complete_file_path)
+                complete_file_path = complete_file_path.replace('\\', '/')
+                tree = ET.parse(complete_file_path)
+                root = tree.getroot()
+                for run in root.findall("Run"):
+                    RunID = run.get('Id')
+                return(RunID)
+            else:
+                "RunInfo Missing"
         except Exception as err:
             raise RuntimeError("** Error: get_run_id_xml Failed (" + str(err) + ")")
 
