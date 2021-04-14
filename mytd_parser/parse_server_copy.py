@@ -217,8 +217,12 @@ class ServerParse(MiSeqParser):
                     if not os.path.exists(output_fastq_filename):
                         # only want to copy/move if file doesn't already exist
                         copy2(fastq_file, output_fastq_dir)
-                    fastq_counter+=1
-                api_logger.info('End: moved '+str(fastq_counter)+' files')
+                        api_logger.info(str(fastq_filename) + ' moved to [' + str(output_fastq_dir) + ']')
+                        fastq_counter += 1
+                    else:
+                        api_logger.info(str(fastq_filename)+' already in ['+str(output_fastq_dir)+']')
+                    api_logger.info('End: moved ' + str(fastq_counter) + ' files')
+
             api_logger.info('[END] move_fastq_files')
         except Exception as err:
             raise RuntimeError("** Error: move_fastq_files Failed (" + str(err) + ")")
