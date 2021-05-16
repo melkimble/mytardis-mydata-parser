@@ -600,6 +600,7 @@ class MiSeqParser:
 
             dirs_group_df = dirs_df.groupby(['project', 'run_id', 'rta_complete']).size().reset_index().rename(columns={0: 'count'})
             # print(dirs_group_df)
+            backup_parsing_dirs = []
 
             for index, row in dirs_group_df.iterrows():
                 project = row['project']
@@ -607,15 +608,18 @@ class MiSeqParser:
                 rta_complete = row['rta_complete']
                 api_logger.info('move_parsing_backup: '+project+', '+run_id)
                 input_copy_dir = output_dir + project + "/" + run_id + "/"
+
                 # if RTAComplete is false, continue to next item in list
                 # Only runs with RTAComplete == True were parsed
                 if not rta_complete:
                     api_logger.info('End: RTAComplete.txt does not exist - run was not parsed ['+project+ " - " +run_id + "]")
                 else:
                     output_move_dir = backup_parsed_dir + project + "/" + run_id + "/"
+                    backup_parsing_dirs.append(output_move_dir)
                     if extra_backup_dirs:
                         for extra_backup_dir in extra_backup_dirs:
                             output_backup_dir = extra_backup_dir + self.backup_parsed_dir_name + project + "/" + run_id + "/"
+                            backup_parsing_dirs.append(output_backup_dir)
                             # copy into each extra backup directory
                             api_logger.info('Start: backup copy - from: [' + input_copy_dir + '], to: [' + output_backup_dir + ']')
                             copy_tree(input_copy_dir, output_backup_dir)
@@ -643,7 +647,8 @@ class MiSeqParser:
 
                     api_logger.info('End: parse backup moved')
             api_logger.info('[END] move_parsing_backup')
-            return (dirs_group_df)
+            backup_parsing_dirs_str = ' \n'.join(map(str, backup_parsing_dirs))
+            return (backup_parsing_dirs_str)
         except Exception as err:
             raise RuntimeError("** Error: move_parsing_backup Failed (" + str(err) + ")")
 
@@ -658,6 +663,7 @@ class MiSeqParser:
             backup_original_dir = self.backup_dir + self.backup_original_dir_name
             extra_backup_dirs = self.extra_backup_dirs
             dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
+            backup_staging_dirs = []
 
             for index, row in dirs_group_df.iterrows():
                 project = row['project']
@@ -665,10 +671,12 @@ class MiSeqParser:
                 input_copy_dir = staging_dir + project + "/" + run_id + "/"
                 output_move_dir = backup_original_dir + project + "/" + run_id + "/"
                 api_logger.info('Start: backup move - from: ['+input_copy_dir+'], to: ['+output_move_dir+']')
+                backup_staging_dirs.append(output_move_dir)
                 if extra_backup_dirs:
                     for extra_backup_dir in extra_backup_dirs:
                         # copy into each extra backup directory
                         output_backup_dir = extra_backup_dir + self.backup_original_dir_name + project + "/" + run_id + "/"
+                        backup_staging_dirs.append(output_backup_dir)
                         api_logger.info('Start: backup copy - from: [' + input_copy_dir + '], to: [' + output_backup_dir + ']')
                         copy_tree(input_copy_dir, output_backup_dir)
                         api_logger.info('End: backup copy')
@@ -692,8 +700,21 @@ class MiSeqParser:
 
                 api_logger.info('End: backup moved')
             api_logger.info('[END] move_staging_backup')
+            backup_staging_dirs_str = ' \n'.join(map(str, backup_staging_dirs))
+            return(backup_staging_dirs_str)
         except Exception as err:
             raise RuntimeError("** Error: move_staging_backup Failed (" + str(err) + ")")
+
+    def show_complete_dialog(self, upload_action, parsing_action, staging_action):
+        import tkinter as tk
+        master = tk.Tk()
+        #master.geometry("600x600")
+        completion_message = "parse_seq_run completed!\n\n"+upload_action+"\n\n"+parsing_action+"\n\n"+staging_action
+        msg = tk.Message(master, text=completion_message)
+        msg.config(bg='lightgreen', font=('Helvetica', 14))
+        msg.pack()
+        tk.mainloop()
+
 
     def complete_upload_backup(self, upload_parsing, move_parsing, move_staging):
         """
@@ -703,6 +724,9 @@ class MiSeqParser:
             api_logger.info('[START] complete_upload_backup')
             if upload_parsing:
                 self.upload_mydata_subprocess()
+                upload_action = "Data uploaded with MyData-Python"
+            else:
+                upload_action = "Use the MyData app to upload data to MyTardis"
             # with RTAComplete=False, all directories will be placed into backup
             # But with RTAComplete=True, only complete runs will be processed
             # even if run was not successful
@@ -710,17 +734,29 @@ class MiSeqParser:
             backup_parsed_dir = self.backup_dir+self.backup_parsed_dir_name
             backup_original_dir = self.backup_dir+self.backup_original_dir_name
             if move_parsing and move_staging:
-                self.move_parsing_backup(dirs_df, upload_parsing)
-                self.move_staging_backup(dirs_df, upload_parsing)
+                backup_parsing_dirs_str = self.move_parsing_backup(dirs_df, upload_parsing)
+                backup_staging_dirs_str = self.move_staging_backup(dirs_df, upload_parsing)
                 api_logger.info('Backup made of parsed and original ['+backup_parsed_dir+', '+backup_original_dir+']')
+                parsing_action = "Parsed data moved to backup dir(s): ["+backup_parsing_dirs_str+"]"
+                staging_action = "Original data moved to backup dir(s): ["+backup_staging_dirs_str+"]"
+                self.show_complete_dialog(upload_action, parsing_action, staging_action)
             elif move_parsing and not move_staging:
-                self.move_parsing_backup(dirs_df, upload_parsing)
+                backup_parsing_dirs_str = self.move_parsing_backup(dirs_df, upload_parsing)
                 api_logger.info('Backup made of parsed ['+backup_parsed_dir+']')
+                parsing_action = "Parsed data moved to backup dir(s): ["+backup_parsing_dirs_str+"]"
+                staging_action = "Original data left in staging dir: ["+backup_parsed_dir+"]"
+                self.show_complete_dialog(upload_action, parsing_action, staging_action)
             elif not move_parsing and move_staging:
-                self.move_staging_backup(dirs_df, upload_parsing)
+                backup_staging_dirs_str = self.move_staging_backup(dirs_df, upload_parsing)
                 api_logger.info('Backup made of original ['+backup_original_dir+']')
+                parsing_action = "Parsed data left in upload dir: ["+backup_original_dir+"]"
+                staging_action = "Original data moved to backup dir(s): ["+backup_staging_dirs_str+"]"
+                self.show_complete_dialog(upload_action, parsing_action, staging_action)
             elif not move_parsing and not move_staging:
                 api_logger.info('No backup created ['+backup_parsed_dir+', '+backup_original_dir+']')
+                parsing_action = "Parsed data left in upload dir: ["+backup_parsed_dir+"]"
+                staging_action = "Original data left in staging dir: ["+backup_original_dir+"]"
+                self.show_complete_dialog(upload_action, parsing_action, staging_action)
             api_logger.info('[END] complete_upload_backup')
         except Exception as err:
             raise RuntimeError("** Error: complete_copy_upload Failed (" + str(err) + ")")

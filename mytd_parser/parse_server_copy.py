@@ -16,17 +16,19 @@ from datetime import datetime
 from mytd_parser.parse_seq_run import MiSeqParser, get_creation_dt
 
 class ServerParse(MiSeqParser):
-    def __init__(self,staging_dir=settings.SERVER_STAGING_DIR,
+    def __init__(self,download_dir=settings.SERVER_DOWNLOAD_DIR,
                  output_dir=settings.SERVER_OUTPUT_DIR,
                  data_directory=settings.SERVER_DATA_DIRECTORY,
+                 upload_bioinfo_results_dir=settings.SERVER_UPLOAD_BR_DIR,
                  log_file_dir=settings.LOG_FILE_DIR):
-        super().__init__(staging_dir, output_dir, data_directory)
-        self.staging_dir = staging_dir
+        super().__init__(download_dir, output_dir, data_directory)
+        self.download_dir = download_dir
         self.output_dir = output_dir
+        self.upload_bioinfo_results_dir = upload_bioinfo_results_dir
         self.log_file_dir = log_file_dir
         # mydata cfgs
         self.data_directory = data_directory
-        print(self.staging_dir)
+        print(self.download_dir)
 
     def check_upload_complete(self, fastq_list_filepath, run_dir):
         api_logger.info('[START] check_upload_complete')
@@ -62,7 +64,7 @@ class ServerParse(MiSeqParser):
             analysis_completes = []
             upload_completes = []
             # make list of all project folders; e.g., maine-edna
-            project_dirs = glob.glob(os.path.join(self.staging_dir, '*/'))
+            project_dirs = glob.glob(os.path.join(self.download_dir, '*/'))
             for project_dir in project_dirs:
                 dir_length = len(os.listdir(project_dir))
                 # if there are no files in the directory, skip processing it
@@ -192,6 +194,21 @@ class ServerParse(MiSeqParser):
         except Exception as err:
             raise RuntimeError("** Error: get_dirs Failed (" + str(err) + ")")
 
+    def create_bioinformatics_results_dir(self, project, run_id):
+        """
+         parse server copy of fastq files
+        """
+        try:
+            api_logger.info('[START] create_bioinformatics_results_dir')
+            upload_bioinfo_results_dir = self.upload_bioinfo_results_dir
+            output_hpc_run_dir = upload_bioinfo_results_dir+project+'/'+run_id+'/Bioinformatics_Results/'
+            api_logger.info('Start create dir: ' + project + ', ' + run_id + ': [' + output_hpc_run_dir + ']')
+            if not os.path.exists(output_hpc_run_dir):
+                os.makedirs(output_hpc_run_dir)
+            api_logger.info('[END] create_bioinformatics_results_dir')
+        except Exception as err:
+            raise RuntimeError("** Error: create_bioinformatics_results_dir Failed (" + str(err) + ")")
+
     def move_fastq_files(self):
         """
          parse server copy of fastq files
@@ -204,6 +221,7 @@ class ServerParse(MiSeqParser):
                 project = row['project']
                 run_id = row['run_id']
                 fastq_dir = row['fastq_dir']
+                self.create_bioinformatics_results_dir(project, run_id)
                 output_fastq_dir = output_dir+run_id+'/'
                 if not os.path.exists(output_fastq_dir):
                     os.makedirs(output_fastq_dir)
@@ -222,7 +240,7 @@ class ServerParse(MiSeqParser):
                     else:
                         api_logger.info(str(fastq_filename)+' already in ['+str(output_fastq_dir)+']')
                 api_logger.info('End: moved ' + str(fastq_counter) + ' files')
-
             api_logger.info('[END] move_fastq_files')
         except Exception as err:
             raise RuntimeError("** Error: move_fastq_files Failed (" + str(err) + ")")
+
