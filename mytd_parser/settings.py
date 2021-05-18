@@ -4,19 +4,18 @@ Created By: mkimble
 LAST MODIFIED: 03/24/2021
 """
 import os
-current_working_dir = os.getcwd()
+
+## grab directory of settings.py
+parser_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 # error logging
-LOG_BASE_DIR = current_working_dir.replace('\\', '/')
-LOG_FILE_DIR = LOG_BASE_DIR+'/logs/'
-
-MISEQ_BASE_DIR = os.path.dirname(os.path.dirname(current_working_dir))
-MISEQ_BASE_DIR = MISEQ_BASE_DIR.replace('\\', '/')
+BASE_DIR = parser_dir.replace('\\', '/')
+LOG_FILE_DIR = BASE_DIR+"/logs/"
 
 # parse_seq_run.py settings
-MISEQ_STAGING_DIR = MISEQ_BASE_DIR+"NGS_Outputs/Staging/"
-MISEQ_UPLOAD_DIR = MISEQ_BASE_DIR+"NGS_Outputs/Upload/"
-MISEQ_BACKUP_DIR = MISEQ_BASE_DIR+"NGS_Outputs/Backup/"
+MISEQ_STAGING_DIR = BASE_DIR+"/NGS_Outputs/Staging/"
+MISEQ_UPLOAD_DIR = BASE_DIR+"/NGS_Outputs/Upload/"
+MISEQ_BACKUP_DIR = BASE_DIR+"/NGS_Outputs/Backup/"
 
 MISEQ_EXTRA_BACKUP_DIRS = []
 
@@ -32,8 +31,3 @@ SERVER_UPLOAD_BR_DIR = "/UMaine2/mytardis_upload/"
 
 # Mydata cfg
 SERVER_DATA_DIRECTORY = SERVER_UPLOAD_BR_DIR
-
-
-
-
-
