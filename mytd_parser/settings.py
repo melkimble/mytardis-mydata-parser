@@ -13,9 +13,9 @@ BASE_DIR = parser_dir.replace('\\', '/')
 LOG_FILE_DIR = BASE_DIR+"/logs/"
 
 # parse_seq_run.py settings
-MISEQ_STAGING_DIR = BASE_DIR+"/NGS_Outputs/Staging/"
-MISEQ_UPLOAD_DIR = BASE_DIR+"/NGS_Outputs/Upload/"
-MISEQ_BACKUP_DIR = BASE_DIR+"/NGS_Outputs/Backup/"
+MISEQ_STAGING_DIR = "D:/NGS_Outputs/Staging/"
+MISEQ_UPLOAD_DIR = "D:/NGS_Outputs/Upload/"
+MISEQ_BACKUP_DIR = "D:/NGS_Outputs/Backup/"
 
 MISEQ_EXTRA_BACKUP_DIRS = []
 
