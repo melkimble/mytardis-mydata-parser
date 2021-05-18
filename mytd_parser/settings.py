@@ -7,9 +7,9 @@ import os
 
 ## grab directory of settings.py
 parser_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+BASE_DIR = parser_dir.replace('\\', '/')
 
 # error logging
-BASE_DIR = parser_dir.replace('\\', '/')
 LOG_FILE_DIR = BASE_DIR+"/logs/"
 
 # parse_seq_run.py settings
