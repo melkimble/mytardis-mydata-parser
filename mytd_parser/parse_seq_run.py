@@ -7,7 +7,7 @@ LAST MODIFIED: 03/24/2021
 
 from . import settings
 import sys
-import os, glob
+import os, glob, re
 import pandas as pd
 from shutil import copy2, move
 from .logger_settings import api_logger
@@ -434,6 +434,42 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: parse_fastq_metadata_dirs Failed (" + str(err) + ")")
 
+    def get_sampleid_primerpair_name(self, sample_id):
+        # Illumina MiSeq converts underscores to dashes
+        # e.g., a sample_id 'eSG_L01_19w_001' will be converted to eSG-L01-19w-001
+        # so here it is being converted back to 'eSG_L01_19w_001' if it is a sample_id > 14
+        if len(sample_id) > 14:
+            # check if sample_id matches pattern
+            pattern = "[a-z][A-Z][A-Z]-[A-Z][0-9][0-9]-[0-9][0-9][a-z]-[0-9][0-9][0-9]+"
+            matched = re.match(pattern, sample_id)
+            is_match = bool(matched)
+            # check if there is a pattern match to naming conventions
+            if is_match:
+                pattern_dash = "[a-z][A-Z][A-Z]-[A-Z][0-9][0-9]-[0-9][0-9][a-z]-[0-9][0-9][0-9]-+"
+                matched = re.match(pattern_dash, sample_id)
+                is_match = bool(matched)
+                # check if there is a pattern match to naming conventions that also includes a primer pair
+                if is_match:
+                    # split based on the pattern so that only things after the pattern are extracted
+                    # e.g., eSG-L01-19w-001-+ anything beyond the last dash, in eSG-L01-19w-001-riaz, it would
+                    # be riaz
+                    primer_pair = re.split(pattern_dash, sample_id)[1]
+                    sample_id = sample_id.replace("-" + primer_pair, '')
+                    sample_id = sample_id.replace("-", "_")
+                    sampleid_primerpair = sample_id+"-"+primer_pair
+                else:
+                    primer_pair = ''
+                    sample_id = sample_id.replace("-", "_")
+                    sampleid_primerpair = sample_id
+            else:
+                primer_pair = ''
+                sampleid_primerpair = sample_id
+        else:
+            primer_pair = ''
+            sampleid_primerpair = sample_id
+        return(sample_id, primer_pair, sampleid_primerpair)
+
+
     def parse_fastq_files(self, export_csv=True):
         """
          parse fastq files
@@ -472,6 +508,8 @@ class MiSeqParser:
                 api_logger.info('Start copying ' + str(num_files) + ' files')
 
                 sample_ids = []
+                primer_pairs = []
+                sampleids_primerpairs = []
                 fastq_create_dates = []
                 for fastq_file in fastq_files_list:
                     # parse each fastq filename for the sample_id
@@ -479,31 +517,30 @@ class MiSeqParser:
                     fastq_create_date = datetime.fromtimestamp(get_creation_dt(fastq_file)).strftime('%Y-%m-%d %H:%M:%S')
                     fastq_name = Path(fastq_file).name
                     sample_id = fastq_name.split('_', 1)[0]
-                    # Illumina MiSeq converts underscores to dashes
-                    # e.g., a sample_id 'eSG_L01_19w_001' will be converted to eSG-L01-19w-001
-                    # so here it is being converted back to 'eSG_L01_19w_001' if it is a sample_id of length 15
-                    if len(sample_id) == 15:
-                        sample_id = sample_id.replace('-','_')
+                    # if pattern matches, extract sample_id and/or primer_pair
+                    sample_id, primer_pair, sampleid_primerpair = self.get_sampleid_primerpair_name(sample_id)
+                    primer_pairs.append(primer_pair)
                     sample_ids.append(sample_id)
+                    sampleids_primerpairs.append(sampleid_primerpair)
                     fastq_create_dates.append(fastq_create_date)
-                fastq_df = pd.DataFrame(list(zip(sample_ids, fastq_create_dates, fastq_files_list)), columns=['sample_id', 'fastq_create_date', 'fastq_path'])
+                fastq_df = pd.DataFrame(list(zip(sample_ids, primer_pairs, sampleids_primerpairs, fastq_create_dates, fastq_files_list)), columns=['sample_id', 'primer_pair', 'sampleid_primerpair', 'fastq_create_date', 'fastq_path'])
 
                 if export_csv:
                     output_csv_filename = datetime.now().strftime(self.log_file_dir+'Fastq_'+align_subdir_name+'_filelist_%Y%m%d_%H%M%S.csv')
                     fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
                 # unique subset of sample_ids sorted by name
 
-                sample_ids_distinct = sorted(unique(sample_ids))
+                sampleids_primerpairs_distinct = sorted(unique(sampleids_primerpairs))
                 file_count = 0
                 fastq_sid_fileslist = []
-                for sample_id in sample_ids_distinct:
+                for sampleid_primerpair in sampleids_primerpairs_distinct:
                     # get filepaths with sampleid in them
-                    fastq_sid_df = fastq_df[fastq_df['sample_id'] == sample_id]
+                    fastq_sid_df = fastq_df[fastq_df['sampleid_primerpair'] == sampleid_primerpair]
                     for index, row in fastq_sid_df.iterrows():
                         fastq_file = row['fastq_path']
-                        output_fastq_sid_dir = output_fastq_dir + sample_id + "/"
+                        output_fastq_sid_dir = output_fastq_dir + sampleid_primerpair + "/"
                         fastq_filename = os.path.basename(fastq_file)
-                        base_fastq_filelist = "Fastq_"+align_subdir_name + "/" + sample_id + "/" + fastq_filename
+                        base_fastq_filelist = "Fastq_"+align_subdir_name + "/" + sampleid_primerpair + "/" + fastq_filename
                         fastq_sid_fileslist.append(base_fastq_filelist)
                         if not os.path.exists(output_fastq_sid_dir):
                             os.makedirs(output_fastq_sid_dir)
@@ -511,11 +548,11 @@ class MiSeqParser:
                         copy2(fastq_file, output_fastq_sid_dir)
                         file_count+=1
                 for summary_file in fastq_summary_file_list:
-                    # copy summary file into each fastq sample_id folder
+                    # copy summary file into each fastq sampleid_primerpair folder
                     copy2(summary_file, output_fastq_dir)
 
                 # add in list of all fastq files for validation server side
-                fastq_sid_df = pd.DataFrame(list(zip(sample_ids, fastq_create_dates, fastq_sid_fileslist)), columns=['sample_id', 'fastq_create_date', 'fastq_path'])
+                fastq_sid_df = pd.DataFrame(list(zip(sample_ids, primer_pairs, sampleids_primerpairs, fastq_create_dates, fastq_sid_fileslist)), columns=['sample_id', 'primer_pair', 'sampleid_primerpair', 'fastq_create_date', 'fastq_path'])
                 output_csv_filename = output_fastq_dir+'Fastq_filelist.csv'
                 fastq_sid_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
 
