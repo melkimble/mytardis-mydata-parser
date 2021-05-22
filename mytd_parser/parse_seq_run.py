@@ -479,6 +479,11 @@ class MiSeqParser:
                     fastq_create_date = datetime.fromtimestamp(get_creation_dt(fastq_file)).strftime('%Y-%m-%d %H:%M:%S')
                     fastq_name = Path(fastq_file).name
                     sample_id = fastq_name.split('_', 1)[0]
+                    # Illumina MiSeq converts underscores to dashes
+                    # e.g., a sample_id 'eSG_L01_19w_001' will be converted to eSG-L01-19w-001
+                    # so here it is being converted back to 'eSG_L01_19w_001' if it is a sample_id of length 15
+                    if len(sample_id) == 15:
+                        sample_id = sample_id.replace('-','_')
                     sample_ids.append(sample_id)
                     fastq_create_dates.append(fastq_create_date)
                 fastq_df = pd.DataFrame(list(zip(sample_ids, fastq_create_dates, fastq_files_list)), columns=['sample_id', 'fastq_create_date', 'fastq_path'])
