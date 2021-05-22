@@ -19,12 +19,17 @@ from datetime import datetime
 import platform
 import pathlib
 
-def unique(list1):
+def unique(list):
     # insert the list to the set
-    list_set = set(list1)
+    #list_set = set(list1)
     # convert the set to the list
-    unique_list = (list(list_set))
-    return(unique_list)
+    #unique_list = (list(list_set))
+    #return(unique_list)
+    seen = set()
+    seen_add = seen.add
+    return [x for x in list if not (x in seen or seen_add(x))]
+
+
 
 def get_creation_dt(directory):
     """
@@ -528,9 +533,8 @@ class MiSeqParser:
                 if export_csv:
                     output_csv_filename = datetime.now().strftime(self.log_file_dir+'Fastq_'+align_subdir_name+'_filelist_%Y%m%d_%H%M%S.csv')
                     fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
-                # unique subset of sample_ids sorted by name
-
-                sampleids_primerpairs_distinct = sorted(unique(sampleids_primerpairs))
+                # unique subset of sample_ids in same order as list
+                sampleids_primerpairs_distinct = unique(sampleids_primerpairs)
                 file_count = 0
                 fastq_sid_fileslist = []
                 for sampleid_primerpair in sampleids_primerpairs_distinct:
