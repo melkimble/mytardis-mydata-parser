@@ -445,12 +445,12 @@ class MiSeqParser:
         # so here it is being converted back to 'eSG_L01_19w_001' if it is a sample_id > 14
         if len(sample_id) > 14:
             # check if sample_id matches pattern
-            pattern = "[a-z][A-Z][A-Z]-[A-Z][0-9][0-9]-[0-9][0-9][a-z]-[0-9][0-9][0-9]+"
+            pattern = "[a-z][A-Z][A-Z]-[A-Z][0-9][0-9]-[0-9][0-9][a-z]-[0-9][0-9][0-9][0-9]+"
             matched = re.match(pattern, sample_id)
             is_match = bool(matched)
             # check if there is a pattern match to naming conventions
             if is_match:
-                pattern_dash = "[a-z][A-Z][A-Z]-[A-Z][0-9][0-9]-[0-9][0-9][a-z]-[0-9][0-9][0-9]-+"
+                pattern_dash = "[a-z][A-Z][A-Z]-[A-Z][0-9][0-9]-[0-9][0-9][a-z]-[0-9][0-9][0-9][0-9]-+"
                 matched = re.match(pattern_dash, sample_id)
                 is_match = bool(matched)
                 # check if there is a pattern match to naming conventions that also includes a primer pair
