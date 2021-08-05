@@ -18,6 +18,7 @@ import datetime
 from datetime import datetime
 import platform
 import pathlib
+import dateutil.parser
 
 def unique(list):
     # insert the list to the set
@@ -123,7 +124,7 @@ class MiSeqParser:
 
     def get_run_id_xml(self, input_run_dir):
         """
-         parse CompleteJobInfo.xml to get correct run id
+         parse RunInfo.xml to get correct run id
          If data are sent multiple times via MyData, mydata-seq-fac will append
          the folder with "-1"; this way the referenced run id is always the correct run id
          for data on the server.
@@ -139,12 +140,68 @@ class MiSeqParser:
                 tree = ET.parse(complete_file_path)
                 root = tree.getroot()
                 for run in root.findall("Run"):
-                    RunID = run.get('Id')
-                return(RunID)
+                    run_id = run.get('Id')
+                return(run_id)
             else:
-                "RunInfo Missing"
+                api_logger.info("RunInfo Missing")
+                return False
         except Exception as err:
             raise RuntimeError("** Error: get_run_id_xml Failed (" + str(err) + ")")
+
+    def get_run_date_xml(self, input_run_dir):
+        """
+         parse CompletedJobInfo.xml to get correct run date
+         If data are sent multiple times via MyData, mydata-seq-fac will append
+         the folder with "-1"; this way the referenced run id is always the correct run id
+         for data on the server.
+        """
+        try:
+            import xml.etree.ElementTree as ET
+            complete_file_name = 'RunInfo.xml'
+            # grab newest CompletedJobInfo.xml in directory
+            complete_file_path = glob.glob(f'{input_run_dir}/**/{complete_file_name}', recursive=True)
+            if complete_file_path:
+                complete_file_path = max(complete_file_path)
+                complete_file_path = complete_file_path.replace('\\', '/')
+                tree = ET.parse(complete_file_path)
+                root = tree.getroot()
+                for run in root.findall("./Run"):
+                    run_date = run.find('Date').text
+                    print(run_date)
+                return(run_date)
+            else:
+                api_logger.info("RunInfo.xml Missing")
+                return False
+        except Exception as err:
+            raise RuntimeError("** Error: get_run_date_xml Failed (" + str(err) + ")")
+
+
+    def get_run_completion_time_xml(self, input_run_dir):
+        """
+         parse CompletedJobInfo.xml to get correct run date
+         If data are sent multiple times via MyData, mydata-seq-fac will append
+         the folder with "-1"; this way the referenced run id is always the correct run id
+         for data on the server.
+        """
+        try:
+            import xml.etree.ElementTree as ET
+            complete_file_name = 'CompletedJobInfo.xml'
+            # grab newest CompletedJobInfo.xml in directory
+            complete_file_path = glob.glob(f'{input_run_dir}/**/{complete_file_name}', recursive=True)
+            if complete_file_path:
+                complete_file_path = max(complete_file_path)
+                complete_file_path = complete_file_path.replace('\\', '/')
+                tree = ET.parse(complete_file_path)
+                root = tree.getroot()
+                for run in root.findall("CompletionTime"):
+                    completion_time = run.text
+                    #print(completion_time)
+                return(completion_time)
+            else:
+                api_logger.info("CompletedJobInfo.xml Missing")
+                return False
+        except Exception as err:
+            raise RuntimeError("** Error: get_run_date_xml Failed (" + str(err) + ")")
 
     def get_dirs(self, export_csv=True, RTAComplete=True):
         """
@@ -289,7 +346,7 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: get_dirs Failed (" + str(err) + ")")
 
-    def copy_metadata_dirs(self,ignore_dirs):
+    def copy_metadata_dirs(self, ignore_dirs):
         """
          copy metadata dirs and files
         """
@@ -865,3 +922,374 @@ class MiSeqParser:
             api_logger.info('End: mydata upload')
         except Exception as err:
             raise RuntimeError("** Error: upload_mydata_py Failed (" + str(err) + ")")
+
+
+class GenericFastqParser(MiSeqParser):
+    def __init__(self, staging_dir=settings.MISEQ_STAGING_DIR,
+                 output_dir=settings.MISEQ_UPLOAD_DIR,
+                 backup_dir=settings.MISEQ_BACKUP_DIR,
+                 extra_backup_dirs=settings.MISEQ_EXTRA_BACKUP_DIRS,
+                 log_file_dir=settings.LOG_FILE_DIR,
+                 data_directory=settings.MISEQ_DATA_DIRECTORY,
+                 folder_structure=settings.FOLDER_STRUCTURE,
+                 mytardis_url=settings.MYTARDIS_URL):
+        super().__init__(staging_dir, output_dir, backup_dir, extra_backup_dirs, log_file_dir, data_directory, folder_structure, mytardis_url)
+        self.staging_dir = staging_dir
+        self.backup_dir = backup_dir
+        self.backup_original_dir_name = "Original/"
+        self.backup_parsed_dir_name = "Parsed/"
+        self.output_dir = output_dir
+        self.extra_backup_dirs = extra_backup_dirs
+        self.log_file_dir = log_file_dir
+        # mydata cfgs
+        self.data_directory = data_directory
+        self.folder_structure = folder_structure
+        self.mytardis_url = mytardis_url
+
+    def get_dirs(self, export_csv=True, RTAComplete=True):
+        """
+         get dirs and put in pandas df
+        """
+        try:
+            projects = []
+            run_ids = []
+            run_dirs = []
+            fastq_dirs = []
+            num_fastq_files = []
+            rta_completes = []
+            num_run_dirs = []
+            run_dates = []
+            run_completion_times = []
+            run_dirs_create_dates = []
+            fastq_dirs_create_dates = []
+            analysis_completes = []
+            project_dirs = glob.glob(os.path.join(self.staging_dir, '*/'))
+
+            for project_dir in project_dirs:
+                dir_length = len(os.listdir(project_dir))
+                # if there are no files in the directory, skip processing it
+                if dir_length == 0:
+                    continue
+                project = Path(project_dir).name
+                # grab sequencing folder directory with most recent date for each project
+                #run_dir = max(glob.glob(os.path.join(project_dir, '*/')), key=os.path.getmtime)
+                #run_dir = run_dir.replace('\\', '/')
+                # change to all sequencing folders in directory
+                run_dir_list = glob.glob(os.path.join(project_dir, '*/'))
+                run_dir_list = [dir_path.replace('\\', '/') for dir_path in run_dir_list]
+                for run_dir in run_dir_list:
+                    # the number of sequencing runs per project
+                    num_run_dir = len(run_dir_list)
+                    # Since run performed by different facility, we are assuming the run was complete
+                    # since they are sending us the completed files
+                    rta_complete = True
+                    # grab run_id from RunInfo.xml
+                    run_id = self.get_run_id_xml(run_dir)
+                    run_date = self.get_run_date_xml(run_dir)
+                    completion_time = self.get_run_completion_time_xml(run_dir)
+                    run_dir_create_date = datetime.fromtimestamp(get_creation_dt(run_dir)).strftime('%Y-%m-%d %H:%M:%S')
+                    # check for .fastqz files in all sub directories of the run_dir
+                    fastq_files = glob.glob(os.path.join(run_dir, '**/*.fastq.gz'), recursive=True)
+                    fastq_files_list = [dir_path.replace('\\', '/') for dir_path in fastq_files]
+                    num_fastq_file = len(fastq_files_list)
+
+                    fastq_dir = os.path.commonpath(fastq_files_list)
+                    fastq_dir = fastq_dir.replace('\\', '/')
+
+                    if not fastq_dir:
+                        # if there are no fastq files, then the analysis did not complete
+                        # append to lists
+                        fastq_dir = fastq_dir_create_date = "Analysis Incomplete"
+                        # if no fastq files, then analysis was not complete
+                        analysis_complete = False
+
+                        # append to lists
+                        projects.append(project)
+                        run_ids.append(run_id)
+                        run_dirs.append(run_dir)
+                        run_dirs_create_dates.append(run_dir_create_date)
+                        num_run_dirs.append(num_run_dir)
+                        fastq_dirs.append(fastq_dir)
+                        fastq_dirs_create_dates.append(fastq_dir_create_date)
+                        rta_completes.append(rta_complete)
+                        analysis_completes.append(analysis_complete)
+
+                        num_fastq_files.append(num_fastq_file)
+                        run_dates.append(run_date)
+                        run_completion_times.append(completion_time)
+
+                    else:
+                        # there are fastq files, then analysis should be complete
+                        analysis_complete = True
+                        fastq_dir_create_date = datetime.fromtimestamp(get_creation_dt(fastq_dir)).strftime('%Y-%m-%d %H:%M:%S')
+                        # append to lists
+                        projects.append(project)
+                        run_ids.append(run_id)
+                        run_dirs.append(run_dir)
+                        run_dirs_create_dates.append(run_dir_create_date)
+                        num_run_dirs.append(num_run_dir)
+                        fastq_dirs.append(fastq_dir)
+                        fastq_dirs_create_dates.append(fastq_dir_create_date)
+                        rta_completes.append(rta_complete)
+                        analysis_completes.append(analysis_complete)
+
+                        num_fastq_files.append(num_fastq_file)
+                        run_dates.append(run_date)
+                        run_completion_times.append(completion_time)
+
+            dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dirs, run_dates, run_completion_times, num_run_dirs,
+                                            run_dirs_create_dates, fastq_dirs, num_fastq_files, fastq_dirs_create_dates,
+                                            rta_completes, analysis_completes)),
+                                   columns=['project', 'run_id', 'run_dir', 'run_date', 'run_completion_time',
+                                            'num_run_dir', 'run_dirs_create_date', 'fastq_dir', 'num_fastq_file',
+                                            'fastq_dirs_create_date', 'rta_complete', 'analysis_complete'])
+            # output dirs to csv
+            if export_csv:
+                output_csv_filename = datetime.now().strftime(self.log_file_dir + 'miseq_dirlist_%Y%m%d_%H%M%S.csv')
+                dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
+            if RTAComplete:
+                # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
+                dirs_df_rta_complete = dirs_df[(dirs_df['rta_complete'] == True) & (dirs_df['analysis_complete'] == True)]
+                return(dirs_df_rta_complete)
+            else:
+                return(dirs_df)
+        except Exception as err:
+            raise RuntimeError("** Error: get_dirs Failed (" + str(err) + ")")
+
+    def copy_metadata_dirs(self, ignore_dirs):
+        """
+         copy metadata dirs and files
+        """
+        try:
+            api_logger.info('[START] copy_metadata_dirs')
+            dirs_df = self.get_dirs(export_csv=True, RTAComplete=True)
+            output_dir = self.output_dir
+            for index, row in dirs_df.iterrows():
+                project = row['project']
+                run_dir = row['run_dir']
+                run_id = row['run_id']
+                run_dir_create_date = row['run_dir_create_date']
+                fastq_dir = row['fastq_dir']
+                # log info
+                api_logger.info('copy_metadata_dirs: '+project+', '+run_id+', ['+run_dir+', '+fastq_dir+']')
+
+                output_metadata_dir = output_dir + project + "/" + run_id + "/run_metadata_"+run_id+"/"
+                # if directory doesn't exist, create it and modify the run dir create date
+                if not os.path.exists(output_metadata_dir):
+                    os.makedirs(output_metadata_dir)
+                    modify_create_date(run_dir, output_dir + project + "/" + run_id + "/")
+                    modify_create_date(run_dir, output_metadata_dir)
+
+                run_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
+                run_dirs_list = [dir_path.replace('\\', '/') for dir_path in run_dirs_list]
+                if ignore_dirs:
+                    # if ignore_dirs = True, do not copy any folders to Upload
+                    ignore_list = run_dirs_list
+                    api_logger.info('Ignore Dirs: ' + str(ignore_list))
+                else:
+                    # copy files to run_metadata folder
+                    # Alignment is here because it will be treated differently
+                    ignore_list = ["Alignment", "Data", "Thumbnail_Images"]
+                    api_logger.info('Ignore Dirs: ' + str(ignore_list))
+                # directories in run folder to keep and move to run_metadata folder
+                keep_dirs_list = [rundir for rundir in run_dirs_list if not any(ignore in rundir for ignore in ignore_list)]
+                api_logger.info('Keep Dirs: '+str(keep_dirs_list))
+                num_dirs = len(keep_dirs_list)
+
+                run_dir_files_list = glob.glob(os.path.join(run_dir, '*'))
+                run_dir_files_list = [dir_path.replace('\\', '/') for dir_path in run_dir_files_list]
+
+                # files in run folder to move to run_metadata folder
+                file_list = [file for file in run_dir_files_list if os.path.isfile(file)]
+                num_files = len(file_list)
+                # log info
+                api_logger.info('Start copying ' + str(num_files) + ' files')
+                file_count=0
+                for file in file_list:
+                    copy2(file, output_metadata_dir)
+                    file_count+=1
+                    # log info
+                api_logger.info('End copied ' + str(file_count) + ' files')
+                if num_dirs > 0:
+                    # if there are directories in list, copy them. Otherwise do nothing.
+                    api_logger.info('Start copying ' + str(num_dirs) + ' dirs')
+                    dir_count=0
+                    for keep_dir in keep_dirs_list:
+                        dir_name = Path(keep_dir).name
+                        copy_tree(keep_dir,output_metadata_dir+dir_name+'/')
+                        modify_create_date(keep_dir, output_metadata_dir+dir_name+'/')
+                        dir_count+=1
+                    # log info
+                    api_logger.info('End copied ' + str(dir_count) + ' dirs')
+            api_logger.info('[END] copy_metadata_dirs')
+            return(dirs_df)
+
+        except Exception as err:
+            raise RuntimeError("** Error: copy_metadata_dirs Failed (" + str(err) + ")")
+
+    def parse_fastq_metadata_dirs(self):
+        """
+         parse fastq metadata dirs
+        """
+        try:
+            api_logger.info('[START] parse_fastq_metadata_dirs')
+            dirs_df = self.copy_metadata_dirs(ignore_dirs=True)
+            output_dir = self.output_dir
+            for index, row in dirs_df.iterrows():
+                #num_align_subdir = row['num_align_subdir']
+                project = row['project']
+                run_id = row['run_id']
+                #align_subdir = row['align_subdir']
+                fastq_dir = row['fastq_dir']
+                completion_time = row['run_completion_time']
+                completion_time_dt = dateutil.parser.parse(completion_time)
+                completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+
+                # log info
+                api_logger.info('parse_fastq_metadata_dirs: '+project+', '+run_id+', ['+fastq_dir+']')
+
+                output_metadata_dir = output_dir + project + "/" + run_id + "/run_metadata_" + run_id + "/"
+
+                fastqdir_list = glob.glob(os.path.join(fastq_dir, '*/'))
+                fastqdir_list = [dir_path.replace('\\', '/') for dir_path in fastqdir_list]
+                # copy files to run_metadata folder
+                # Alignment is here because it will be treated differently
+                ignore_list = ["Fastq"]
+                # directories in run folder to keep and move to run_metadata folder
+                keep_dirs_list = [subdir for subdir in fastqdir_list if not any(ignore in subdir for ignore in ignore_list)]
+                # log info
+                api_logger.info('Keep Dirs: '+str(keep_dirs_list))
+                num_dirs = len(keep_dirs_list)
+
+                fastq_dir_files_list = glob.glob(os.path.join(fastq_dir, '*'))
+                fastq_dir_files_list = [dir_path.replace('\\', '/') for dir_path in fastq_dir_files_list]
+
+                # files in run folder to move to run_metadata folder
+                file_list = [file for file in fastq_dir_files_list if os.path.isfile(file)]
+                num_files = len(file_list)
+                # files in run folder to move to run_metadata folder
+
+                # log info
+                api_logger.info('Start copying ' + str(num_files) + ' files')
+
+                output_fastq_metadata_dir = output_metadata_dir + 'Fastq_' + completion_time_fmt + '/'
+                if not os.path.exists(output_fastq_metadata_dir):
+                    os.makedirs(output_fastq_metadata_dir)
+                    modify_create_date(fastq_dir, output_fastq_metadata_dir)
+                file_count=0
+                for file in file_list:
+                    copy2(file, output_fastq_metadata_dir)
+                    file_count+=1
+                # log info
+                api_logger.info('End copied ' + str(file_count) + ' files')
+                api_logger.info('Start copying ' + str(num_dirs) + ' dirs')
+                dir_count=0
+                for keep_dir in keep_dirs_list:
+                    dir_name = Path(keep_dir).name
+                    output_fastq_metadata_subdir = output_fastq_metadata_dir+dir_name+'/'
+                    if not os.path.exists(output_fastq_metadata_subdir):
+                        os.makedirs(output_fastq_metadata_subdir)
+                        modify_create_date(keep_dir, output_fastq_metadata_subdir)
+                    copy_tree(keep_dir,output_fastq_metadata_subdir)
+                    dir_count+=1
+                # log info
+                api_logger.info('End copied ' + str(dir_count) + ' dirs')
+            api_logger.info('[END] parse_fastq_metadata_dirs')
+            return (dirs_df)
+        except Exception as err:
+            raise RuntimeError("** Error: parse_fastq_metadata_dirs Failed (" + str(err) + ")")
+
+    def parse_fastq_files(self, export_csv=True):
+        """
+         parse fastq files
+        """
+        try:
+            api_logger.info('[START] parse_fastq_files')
+            dirs_df = self.parse_fastq_metadata_dirs()
+            output_dir = self.output_dir
+            for index, row in dirs_df.iterrows():
+                #num_align_subdir = row['num_align_subdir']
+                project = row['project']
+                run_id = row['run_id']
+                #align_subdir = row['align_subdir']
+                fastq_dir = row['fastq_dir']
+                completion_time = row['run_completion_time']
+                completion_time_dt = dateutil.parser.parse(completion_time)
+                completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+
+                # log info
+                api_logger.info('parse_fastq_files: '+project+', '+run_id+', ['+fastq_dir+'] ')
+                # use formatted name completion time for fastq filename. completion_time_fmt ==> "20201224_205858"
+                output_run_dir = output_dir + project + "/" + run_id + "/"
+                output_fastq_dir = output_run_dir + "Fastq_"+completion_time_fmt + "/"
+                if not os.path.exists(output_fastq_dir):
+                    os.makedirs(output_fastq_dir)
+                    modify_create_date(fastq_dir, output_fastq_dir)
+
+                fastq_files_list = glob.glob(os.path.join(fastq_dir, '*.fastq.gz'))
+                fastq_files_list = [dir_path.replace('\\', '/') for dir_path in fastq_files_list]
+                fastq_summary_file_list = glob.glob(os.path.join(fastq_dir, '*.txt'))
+                fastq_summary_file_list = [dir_path.replace('\\', '/') for dir_path in fastq_summary_file_list]
+
+                # files in run folder to move to run_metadata folder
+                num_files = len(fastq_files_list)
+                # files in run folder to move to run_metadata folder
+
+                # log info
+                api_logger.info('Start copying ' + str(num_files) + ' files')
+
+                sample_ids = []
+                primer_pairs = []
+                sampleids_primerpairs = []
+                fastq_create_dates = []
+                for fastq_file in fastq_files_list:
+                    # parse each fastq filename for the sample_id
+                    # leftmost after underscore split
+                    fastq_create_date = datetime.fromtimestamp(get_creation_dt(fastq_file)).strftime('%Y-%m-%d %H:%M:%S')
+                    fastq_name = Path(fastq_file).name
+                    sample_id = fastq_name.split('_', 1)[0]
+                    # if pattern matches, extract sample_id and/or primer_pair
+                    sample_id, primer_pair, sampleid_primerpair = self.get_sampleid_primerpair_name(sample_id)
+                    primer_pairs.append(primer_pair)
+                    sample_ids.append(sample_id)
+                    sampleids_primerpairs.append(sampleid_primerpair)
+                    fastq_create_dates.append(fastq_create_date)
+                fastq_df = pd.DataFrame(list(zip(sample_ids, primer_pairs, sampleids_primerpairs, fastq_create_dates, fastq_files_list)), columns=['sample_id', 'primer_pair', 'sampleid_primerpair', 'fastq_create_date', 'fastq_path'])
+
+                if export_csv:
+                    output_csv_filename = datetime.now().strftime(self.log_file_dir+'Fastq_'+completion_time_fmt+'_filelist_%Y%m%d_%H%M%S.csv')
+                    fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
+                # unique subset of sample_ids in same order as list
+                sampleids_primerpairs_distinct = unique(sampleids_primerpairs)
+                file_count = 0
+                fastq_sid_fileslist = []
+                for sampleid_primerpair in sampleids_primerpairs_distinct:
+                    # get filepaths with sampleid in them
+                    fastq_sid_df = fastq_df[fastq_df['sampleid_primerpair'] == sampleid_primerpair]
+                    for index, row in fastq_sid_df.iterrows():
+                        fastq_file = row['fastq_path']
+                        output_fastq_sid_dir = output_fastq_dir + sampleid_primerpair + "/"
+                        fastq_filename = os.path.basename(fastq_file)
+                        base_fastq_filelist = "Fastq_"+completion_time_fmt + "/" + sampleid_primerpair + "/" + fastq_filename
+                        fastq_sid_fileslist.append(base_fastq_filelist)
+                        if not os.path.exists(output_fastq_sid_dir):
+                            os.makedirs(output_fastq_sid_dir)
+                            modify_create_date(fastq_dir, output_fastq_sid_dir)
+                        copy2(fastq_file, output_fastq_sid_dir)
+                        file_count+=1
+                for summary_file in fastq_summary_file_list:
+                    # copy summary file into each fastq sampleid_primerpair folder
+                    copy2(summary_file, output_fastq_dir)
+
+                # add in list of all fastq files for validation server side
+                fastq_sid_df = pd.DataFrame(list(zip(sample_ids, primer_pairs, sampleids_primerpairs, fastq_create_dates,
+                                                     fastq_sid_fileslist)), columns=['sample_id', 'primer_pair', 'sampleid_primerpair', 'fastq_create_date', 'fastq_path'])
+                output_csv_filename = output_fastq_dir+'Fastq_filelist.csv'
+                fastq_sid_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
+
+                # log info
+                api_logger.info('End copied ' + str(file_count) + ' files')
+            api_logger.info('[END] parse_fastq_files')
+            return(dirs_df)
+        except Exception as err:
+            raise RuntimeError("** Error: parse_fastq_files Failed (" + str(err) + ")")
