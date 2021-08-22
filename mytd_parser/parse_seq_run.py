@@ -81,6 +81,31 @@ def modify_create_date(old_dir, new_dir):
         raise RuntimeError("** Error: modify_create_date Failed (" + str(err) + ")")
 
 
+def get_generic_run_dirs():
+    project_dirs = glob.glob(os.path.join(settings.MISEQ_STAGING_DIR, '*/'))
+
+    for project_dir in project_dirs:
+        dir_length = len(os.listdir(project_dir))
+        # if there are no files in the directory, skip processing it
+        if dir_length == 0:
+            continue
+        project = Path(project_dir).name
+
+        run_dir_list = glob.glob(os.path.join(project_dir, '*/'))
+        run_dir_list = [dir_path.replace('\\', '/') for dir_path in run_dir_list]
+        for run_dir in run_dir_list:
+            alignment_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
+            # convert forward slashes to backwards slashes
+            alignment_dirs_list = [dir_path.replace('\\', '/') for dir_path in alignment_dirs_list]
+            # grab filepath with "Alignment" in it
+            alignment_dir = [algndir for algndir in alignment_dirs_list if "Alignment" in algndir]
+            if not alignment_dir:
+                generic_run = True
+            else:
+                generic_run = False
+            return generic_run, run_dir, project
+
+
 class MiSeqParser:
     def __init__(self, staging_dir=settings.MISEQ_STAGING_DIR,
                  output_dir=settings.MISEQ_UPLOAD_DIR,
@@ -172,7 +197,7 @@ class MiSeqParser:
                 root = tree.getroot()
                 for run in root.findall("./Run"):
                     run_date = run.find('Date').text
-                    print(run_date)
+                    # print(run_date)
                 return(run_date)
             else:
                 api_logger.info("RunInfo.xml Missing")
@@ -1142,6 +1167,12 @@ class GenericFastqParser(MiSeqParser):
                 run_id = row['run_id']
                 run_dir_create_date = row['run_dir_create_date']
                 fastq_dir = row['fastq_dir']
+                completion_time = row['run_completion_time']
+                completion_time_dt = dateutil.parser.parse(completion_time)
+                completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+
+                fastq_ignore_dir = "Fastq_"+completion_time_fmt + "/"
+
                 # log info
                 api_logger.info('copy_metadata_dirs: '+project+', '+run_id+', ['+run_dir+', '+fastq_dir+']')
 
@@ -1161,7 +1192,7 @@ class GenericFastqParser(MiSeqParser):
                 else:
                     # copy files to run_metadata folder
                     # Alignment is here because it will be treated differently
-                    ignore_list = ["Alignment", "Data", "Thumbnail_Images"]
+                    ignore_list = [fastq_ignore_dir, "Alignment", "Data", "Thumbnail_Images"]
                     api_logger.info('Ignore Dirs: ' + str(ignore_list))
                 # directories in run folder to keep and move to run_metadata folder
                 keep_dirs_list = [rundir for rundir in run_dirs_list if not any(ignore in rundir for ignore in ignore_list)]
@@ -1233,7 +1264,12 @@ class GenericFastqParser(MiSeqParser):
                 api_logger.info('Keep Dirs: '+str(keep_dirs_list))
                 num_dirs = len(keep_dirs_list)
 
-                fastq_dir_files_list = glob.glob(os.path.join(fastq_dir, '*'))
+                #fastq_dir_files_list = glob.glob(os.path.join(fastq_dir, '*'))
+                # cannot exclude files with two periods e.g., ".fastq.gz" from list of files
+                # with regex, so have to subtract sets
+                fastq_dir_all_list = glob.glob(os.path.join(fastq_dir, '**/*'), recursive=True)
+                fastq_dir_fastq_list = glob.glob(os.path.join(fastq_dir, '**/*.fastq.gz'), recursive=True)
+                fastq_dir_files_list = set(fastq_dir_all_list) - set(fastq_dir_fastq_list)
                 fastq_dir_files_list = [dir_path.replace('\\', '/') for dir_path in fastq_dir_files_list]
 
                 # files in run folder to move to run_metadata folder
@@ -1262,7 +1298,7 @@ class GenericFastqParser(MiSeqParser):
                     if not os.path.exists(output_fastq_metadata_subdir):
                         os.makedirs(output_fastq_metadata_subdir)
                         modify_create_date(keep_dir, output_fastq_metadata_subdir)
-                    copy_tree(keep_dir,output_fastq_metadata_subdir)
+                    copy_tree(keep_dir, output_fastq_metadata_subdir)
                     dir_count+=1
                 # log info
                 api_logger.info('End copied ' + str(dir_count) + ' dirs')
