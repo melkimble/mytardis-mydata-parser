@@ -350,12 +350,6 @@ class MiSeqParser:
                                 fastq_dirs_create_dates.append(fastq_dir_create_date)
                                 rta_completes.append(rta_complete)
                                 analysis_completes.append(analysis_complete)
-            dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dirs, run_dirs_create_dates, num_run_dirs,
-                                            align_subdirs, align_subdirs_create_dates, num_align_subdirs,
-                                            fastq_dirs, fastq_dirs_create_dates, rta_completes, analysis_completes)),
-                                   columns=['project', 'run_id', 'run_dir', 'run_dir_create_date', 'num_run_dir',
-                                            'align_subdir', 'align_subdir_create_date', 'num_align_subdir',
-                                            'fastq_dir', 'fastq_dir_create_date', 'rta_complete', 'analysis_complete'])
 
             dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dates, run_completion_times,
                                             run_dirs, run_dirs_create_dates, num_run_dirs,
