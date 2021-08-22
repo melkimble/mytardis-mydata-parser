@@ -219,6 +219,9 @@ class MiSeqParser:
             projects = []
             num_align_subdirs = []
             rta_completes = []
+            run_dates = []
+            run_completion_times = []
+            num_fastq_files = []
             num_run_dirs = []
             run_dirs_create_dates = []
             fastq_dirs_create_dates = []
@@ -244,11 +247,17 @@ class MiSeqParser:
                     # if rta_complete exists, sets variable to True to be filtered on
                     # to only process rta_complete directories
                     rta_complete = self.check_rta_complete(run_dir)
-                    # grab run_id from RunInfo.xml
-                    run_id = self.get_run_id_xml(run_dir)
                     # run_id = Path(run_dir).name
+                    # grab run_id and run_date from RunInfo.xml
+                    run_id = self.get_run_id_xml(run_dir)
+                    run_date = self.get_run_date_xml(run_dir)
+                    # grab completion_time from CompleteJobInfo.xml
+                    completion_time = self.get_run_completion_time_xml(run_dir)
                     run_dir_create_date = datetime.fromtimestamp(get_creation_dt(run_dir)).strftime('%Y-%m-%d %H:%M:%S')
-                    # grab run_id from CompleteJobInfo.xml
+                    # check for .fastqz files in all sub directories of the run_dir
+                    fastq_files = glob.glob(os.path.join(run_dir, '**/*.fastq.gz'), recursive=True)
+                    fastq_files_list = [dir_path.replace('\\', '/') for dir_path in fastq_files]
+                    num_fastq_file = len(fastq_files_list)
                     if not rta_complete:
                         # if rta_complete is false, then the run is not complete
                         align_subdir = align_subdir_create_date = num_align_subdir = fastq_dir = fastq_dir_create_date = "Run Failed"
@@ -258,6 +267,9 @@ class MiSeqParser:
                         # append to lists
                         projects.append(project)
                         run_ids.append(run_id)
+                        run_dates.append(run_date)
+                        run_completion_times.append(completion_time)
+                        num_fastq_files.append(num_fastq_file)
                         run_dirs.append(run_dir)
                         run_dirs_create_dates.append(run_dir_create_date)
                         num_run_dirs.append(num_run_dir)
@@ -285,6 +297,9 @@ class MiSeqParser:
                             # append to lists
                             projects.append(project)
                             run_ids.append(run_id)
+                            run_dates.append(run_date)
+                            run_completion_times.append(completion_time)
+                            num_fastq_files.append(num_fastq_file)
                             run_dirs.append(run_dir)
                             run_dirs_create_dates.append(run_dir_create_date)
                             num_run_dirs.append(num_run_dir)
@@ -322,6 +337,9 @@ class MiSeqParser:
                                 # append to lists
                                 projects.append(project)
                                 run_ids.append(run_id)
+                                run_dates.append(run_date)
+                                run_completion_times.append(completion_time)
+                                num_fastq_files.append(num_fastq_file)
                                 run_dirs.append(run_dir)
                                 run_dirs_create_dates.append(run_dir_create_date)
                                 num_run_dirs.append(num_run_dir)
@@ -334,10 +352,21 @@ class MiSeqParser:
                                 analysis_completes.append(analysis_complete)
             dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dirs, run_dirs_create_dates, num_run_dirs,
                                             align_subdirs, align_subdirs_create_dates, num_align_subdirs,
-                                            fastq_dirs,fastq_dirs_create_dates,rta_completes, analysis_completes)),
+                                            fastq_dirs, fastq_dirs_create_dates, rta_completes, analysis_completes)),
                                    columns=['project', 'run_id', 'run_dir', 'run_dir_create_date', 'num_run_dir',
                                             'align_subdir', 'align_subdir_create_date', 'num_align_subdir',
                                             'fastq_dir', 'fastq_dir_create_date', 'rta_complete', 'analysis_complete'])
+
+            dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dates, run_completion_times,
+                                            run_dirs, run_dirs_create_dates, num_run_dirs,
+                                            align_subdirs, align_subdirs_create_dates, num_align_subdirs,
+                                            fastq_dirs, num_fastq_files, fastq_dirs_create_dates,
+                                            rta_completes, analysis_completes)),
+                                   columns=['projects', 'run_ids', 'run_dates', 'run_completion_times',
+                                            'run_dirs', 'run_dirs_create_dates', 'num_run_dirs',
+                                            'align_subdir', 'align_subdir_create_date', 'num_align_subdir',
+                                            'fastq_dir', 'num_fastq_files', 'fastq_dir_create_date',
+                                            'rta_complete', 'analysis_complete'])
             # output dirs to csv
             if export_csv:
                 output_csv_filename = datetime.now().strftime(self.log_file_dir + 'miseq_dirlist_%Y%m%d_%H%M%S.csv')
@@ -1083,12 +1112,15 @@ class GenericFastqParser(MiSeqParser):
                         run_dates.append(run_date)
                         run_completion_times.append(completion_time)
 
-            dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dirs, run_dates, run_completion_times,
-                                            num_run_dirs, run_dirs_create_dates, fastq_dirs, num_fastq_files,
-                                            fastq_dirs_create_dates, rta_completes, analysis_completes)),
-                                   columns=['project', 'run_id', 'run_dir', 'run_date', 'run_completion_time',
-                                            'num_run_dir', 'run_dirs_create_date', 'fastq_dir', 'num_fastq_file',
-                                            'fastq_dirs_create_date', 'rta_complete', 'analysis_complete'])
+            dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dates, run_completion_times,
+                                            run_dirs, run_dirs_create_dates, num_run_dirs,
+                                            fastq_dirs, num_fastq_files, fastq_dirs_create_dates,
+                                            rta_completes, analysis_completes)),
+                                   columns=['project', 'run_id', 'run_date', 'run_completion_time',
+                                            'run_dir', 'run_dir_create_date', 'num_run_dir',
+                                            'fastq_dir', 'num_fastq_file', 'fastq_dirs_create_date',
+                                            'rta_complete', 'analysis_complete'])
+
             # output dirs to csv
             if export_csv:
                 output_csv_filename = datetime.now().strftime(self.log_file_dir + 'miseq_dirlist_%Y%m%d_%H%M%S.csv')
