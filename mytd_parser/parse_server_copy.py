@@ -15,8 +15,9 @@ import datetime
 from datetime import datetime
 from mytd_parser.parse_seq_run import MiSeqParser, get_creation_dt
 
+
 class ServerParse(MiSeqParser):
-    def __init__(self,download_dir=settings.SERVER_DOWNLOAD_DIR,
+    def __init__(self, download_dir=settings.SERVER_DOWNLOAD_DIR,
                  output_dir=settings.SERVER_OUTPUT_DIR,
                  data_directory=settings.SERVER_DATA_DIRECTORY,
                  upload_bioinfo_results_dir=settings.SERVER_UPLOAD_BR_DIR,
@@ -176,7 +177,7 @@ class ServerParse(MiSeqParser):
                                     upload_completes.append(upload_complete)
 
             dirs_df = pd.DataFrame(list(zip(projects, run_ids, run_dirs, run_dirs_create_dates, num_run_dirs,
-                                             fastq_dirs, fastq_dirs_create_dates, num_fastq_dirs, rta_completes,
+                                            fastq_dirs, fastq_dirs_create_dates, num_fastq_dirs, rta_completes,
                                             analysis_completes, upload_completes)),
                                    columns=['project', 'run_id', 'run_dir','run_dir_create_date', 'num_run_dir',
                                             'fastq_dir', 'fastq_dir_create_date', 'num_fastq_dir', 'rta_complete',

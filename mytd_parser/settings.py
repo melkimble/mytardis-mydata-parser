@@ -16,6 +16,7 @@ LOG_FILE_DIR = BASE_DIR+"/logs/"
 MISEQ_STAGING_DIR = "D:/NGS_Outputs/Staging/"
 MISEQ_UPLOAD_DIR = "D:/NGS_Outputs/Upload/"
 MISEQ_BACKUP_DIR = "D:/NGS_Outputs/Backup/"
+CREATE_FASTQ_SID_DIRS = False
 
 MISEQ_EXTRA_BACKUP_DIRS = []
 
