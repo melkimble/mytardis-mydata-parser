@@ -973,6 +973,7 @@ class GenericFastqParser(MiSeqParser):
                  output_dir=settings.MISEQ_UPLOAD_DIR,
                  backup_dir=settings.MISEQ_BACKUP_DIR,
                  extra_backup_dirs=settings.MISEQ_EXTRA_BACKUP_DIRS,
+                 create_fastq_sid_dirs=settings.CREATE_FASTQ_SID_DIRS,
                  log_file_dir=settings.LOG_FILE_DIR,
                  data_directory=settings.MISEQ_DATA_DIRECTORY,
                  folder_structure=settings.FOLDER_STRUCTURE,
@@ -984,6 +985,7 @@ class GenericFastqParser(MiSeqParser):
         self.backup_parsed_dir_name = "Parsed/"
         self.output_dir = output_dir
         self.extra_backup_dirs = extra_backup_dirs
+        self.create_fastq_sid_dirs = create_fastq_sid_dirs
         self.log_file_dir = log_file_dir
         # mydata cfgs
         self.data_directory = data_directory
@@ -1251,6 +1253,7 @@ class GenericFastqParser(MiSeqParser):
             api_logger.info('[START] parse_fastq_files')
             dirs_df = self.parse_fastq_metadata_dirs()
             output_dir = self.output_dir
+            create_fastq_sid_dirs = self.create_fastq_sid_dirs
             for index, row in dirs_df.iterrows():
                 # num_align_subdir = row['num_align_subdir']
                 project = row['project']
@@ -1306,31 +1309,29 @@ class GenericFastqParser(MiSeqParser):
                 if export_csv:
                     output_csv_filename = datetime.now().strftime(self.log_file_dir+'Fastq_'+completion_time_fmt+'_filelist_%Y%m%d_%H%M%S.csv')
                     fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
-                # unique subset of sample_ids in same order as list
-                sampleids_primerpairs_distinct = unique(sampleids_primerpairs)
-                file_count = 0
-                fastq_sid_fileslist = []
-                for sampleid_primerpair in sampleids_primerpairs_distinct:
-                    # get filepaths with sampleid in them
-                    fastq_sid_df = fastq_df[fastq_df['sampleid_primerpair'] == sampleid_primerpair]
-                    for index, row in fastq_sid_df.iterrows():
-                        fastq_file = row['fastq_path']
-                        output_fastq_sid_dir = output_fastq_dir + sampleid_primerpair + "/"
-                        fastq_filename = os.path.basename(fastq_file)
-                        base_fastq_filelist = "Fastq_"+completion_time_fmt + "/" + sampleid_primerpair + "/" + fastq_filename
-                        fastq_sid_fileslist.append(base_fastq_filelist)
-                        if not os.path.exists(output_fastq_sid_dir):
-                            os.makedirs(output_fastq_sid_dir)
-                            modify_create_date(fastq_dir, output_fastq_sid_dir)
-                        copy2(fastq_file, output_fastq_sid_dir)
-                        file_count+=1
+
+                if create_fastq_sid_dirs:
+                    fastq_sid_fileslist, file_count = self.copy2_fastq_sid_dirs(fastq_df, fastq_dir,
+                                                                                output_fastq_dir,
+                                                                                completion_time_fmt,
+                                                                                sampleids_primerpairs)
+                else:
+                    fastq_sid_fileslist, file_count = self.copy2_output_fastq_dir(fastq_df,
+                                                                                  output_fastq_dir,
+                                                                                  completion_time_fmt,
+                                                                                  sampleids_primerpairs)
+
                 for summary_file in fastq_summary_file_list:
                     # copy summary file into each fastq sampleid_primerpair folder
                     copy2(summary_file, output_fastq_dir)
 
                 # add in list of all fastq files for validation server side
-                fastq_sid_df = pd.DataFrame(list(zip(sample_ids, primer_pairs, sampleids_primerpairs, fastq_create_dates,
-                                                     fastq_sid_fileslist)), columns=['sample_id', 'primer_pair', 'sampleid_primerpair', 'fastq_create_date', 'fastq_path'])
+                fastq_sid_df = pd.DataFrame(list(zip(sample_ids, primer_pairs, sampleids_primerpairs,
+                                                     fastq_create_dates, fastq_sid_fileslist)), columns=['sample_id',
+                                                                                     'primer_pair',
+                                                                                     'sampleid_primerpair',
+                                                                                     'fastq_create_date',
+                                                                                     'fastq_path'])
                 output_csv_filename = output_fastq_dir+'Fastq_filelist.csv'
                 fastq_sid_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
 
