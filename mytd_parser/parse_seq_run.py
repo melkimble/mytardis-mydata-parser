@@ -81,7 +81,7 @@ def modify_create_date(old_dir, new_dir):
         raise RuntimeError("** Error: modify_create_date Failed (" + str(err) + ")")
 
 
-def get_generic_run_dirs():
+def check_generic_run_dirs():
     project_dirs = glob.glob(os.path.join(settings.MISEQ_STAGING_DIR, '*/'))
 
     for project_dir in project_dirs:
@@ -94,16 +94,18 @@ def get_generic_run_dirs():
         run_dir_list = glob.glob(os.path.join(project_dir, '*/'))
         run_dir_list = [dir_path.replace('\\', '/') for dir_path in run_dir_list]
         for run_dir in run_dir_list:
+            # the number of sequencing runs per project
+            num_run_dir = len(run_dir_list)
             alignment_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
             # convert forward slashes to backwards slashes
             alignment_dirs_list = [dir_path.replace('\\', '/') for dir_path in alignment_dirs_list]
             # grab filepath with "Alignment" in it
             alignment_dir = [algndir for algndir in alignment_dirs_list if "Alignment" in algndir]
             if not alignment_dir:
-                generic_run = True
+                GenericFastqParser.parse_fastq_files(run_dir, project, num_run_dir)
+
             else:
-                generic_run = False
-            return generic_run, run_dir, project
+                MiSeqParser.parse_fastq_files(run_dir, project, num_run_dir)
 
 
 class MiSeqParser:
