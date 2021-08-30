@@ -224,6 +224,17 @@ def get_sampleid_primerpair_name(sample_id):
     return sample_id, primer_pair, sampleid_primerpair
 
 
+def show_complete_dialog(upload_action, parsing_action, staging_action):
+    import tkinter as tk
+    master = tk.Tk()
+    # master.geometry("600x600")
+    completion_message = "parse_seq_run completed!\n\n"+upload_action+"\n\n"+parsing_action+"\n\n"+staging_action
+    msg = tk.Message(master, text=completion_message)
+    msg.config(bg='lightgreen', font=('Helvetica', 14))
+    msg.pack()
+    tk.mainloop()
+
+
 def parse_seq_dirs(upload_parsing=False, move_parsing=False, move_staging=False):
     project_dirs = glob.glob(os.path.join(settings.MISEQ_STAGING_DIR, '*/'))
 
@@ -244,13 +255,16 @@ def parse_seq_dirs(upload_parsing=False, move_parsing=False, move_staging=False)
             # grab filepath with "Alignment" in it
             alignment_dir = [algndir for algndir in alignment_dirs_list if "Alignment" in algndir]
             if not alignment_dir:
-                gp = GenericParser(run_dir, project, num_run_dir)
-                gp.parse_fastq_files()
-                gp.complete_upload_backup(upload_parsing, move_parsing, move_staging)
+                gp = GenericParser(project, run_dir, num_run_dir)
+                dirs_df = gp.parse_fastq_files()
+                upload_action, parsing_action, staging_action = gp.complete_upload_backup(dirs_df, upload_parsing,
+                                                                                          move_parsing, move_staging)
             else:
-                mp = MiSeqParser(run_dir, project, num_run_dir)
-                mp.parse_fastq_files()
-                mp.complete_upload_backup(upload_parsing, move_parsing, move_staging)
+                mp = MiSeqParser(project, run_dir, num_run_dir)
+                dirs_df = mp.parse_fastq_files()
+                upload_action, parsing_action, staging_action = mp.complete_upload_backup(dirs_df, upload_parsing,
+                                                                                          move_parsing, move_staging)
+    show_complete_dialog(upload_action, parsing_action, staging_action)
 
 
 class MiSeqParser:
@@ -426,7 +440,7 @@ class MiSeqParser:
                                             fastq_dirs, num_fastq_files, fastq_dirs_create_dates,
                                             rta_completes, analysis_completes)),
                                    columns=['parse_date', 'project', 'run_id', 'run_date', 'run_completion_time',
-                                            'run_dir', 'run_dirs_create_date', 'num_run_dir',
+                                            'run_dir', 'run_dir_create_date', 'num_run_dir',
                                             'align_subdir', 'align_subdir_create_date', 'num_align_subdir',
                                             'fastq_dir', 'num_fastq_files', 'fastq_dir_create_date',
                                             'rta_complete', 'analysis_complete'])
@@ -934,17 +948,7 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: move_staging_backup Failed (" + str(err) + ")")
 
-    def show_complete_dialog(self, upload_action, parsing_action, staging_action):
-        import tkinter as tk
-        master = tk.Tk()
-        # master.geometry("600x600")
-        completion_message = "parse_seq_run completed!\n\n"+upload_action+"\n\n"+parsing_action+"\n\n"+staging_action
-        msg = tk.Message(master, text=completion_message)
-        msg.config(bg='lightgreen', font=('Helvetica', 14))
-        msg.pack()
-        tk.mainloop()
-
-    def complete_upload_backup(self, upload_parsing, move_parsing, move_staging):
+    def complete_upload_backup(self, dirs_df, upload_parsing, move_parsing, move_staging):
         """
          Create MYTDComplete.txt files in parsed and original folders in backup directory
         """
@@ -958,7 +962,7 @@ class MiSeqParser:
             # with rta_complete=False, all directories will be placed into backup
             # But with rta_complete=True, only complete runs will be processed
             # even if run was not successful
-            dirs_df = self.get_dirs(export_csv=False, rta_complete=True)
+            #dirs_df = self.get_dirs(export_csv=False, rta_complete=True)
             backup_parsed_dir = self.backup_dir+self.backup_parsed_dir_name
             backup_original_dir = self.backup_dir+self.backup_original_dir_name
             if move_parsing and move_staging:
@@ -968,25 +972,22 @@ class MiSeqParser:
                                 backup_original_dir + ']')
                 parsing_action = "Parsed data moved to backup dir(s): [" + backup_parsing_dirs_str + "]"
                 staging_action = "Original data moved to backup dir(s): [" + backup_staging_dirs_str + "]"
-                self.show_complete_dialog(upload_action, parsing_action, staging_action)
             elif move_parsing and not move_staging:
                 backup_parsing_dirs_str = self.move_parsing_backup(dirs_df, upload_parsing)
                 api_logger.info('Backup made of parsed [' + backup_parsed_dir + ']')
                 parsing_action = "Parsed data moved to backup dir(s): [" + backup_parsing_dirs_str + "]"
                 staging_action = "Original data left in staging dir: [" + backup_parsed_dir + "]"
-                self.show_complete_dialog(upload_action, parsing_action, staging_action)
             elif not move_parsing and move_staging:
                 backup_staging_dirs_str = self.move_staging_backup(dirs_df, upload_parsing)
                 api_logger.info('Backup made of original [' + backup_original_dir + ']')
                 parsing_action = "Parsed data left in upload dir: [" + backup_original_dir + "]"
                 staging_action = "Original data moved to backup dir(s): [" + backup_staging_dirs_str + "]"
-                self.show_complete_dialog(upload_action, parsing_action, staging_action)
             elif not move_parsing and not move_staging:
                 api_logger.info('No backup created [' + backup_parsed_dir + ', ' + backup_original_dir + ']')
                 parsing_action = "Parsed data left in upload dir: [" + backup_parsed_dir + "]"
                 staging_action = "Original data left in staging dir: [" + backup_original_dir + "]"
-                self.show_complete_dialog(upload_action, parsing_action, staging_action)
             api_logger.info('[END] complete_upload_backup')
+            return upload_action, parsing_action, staging_action
         except Exception as err:
             raise RuntimeError("** Error: complete_copy_upload Failed (" + str(err) + ")")
 
@@ -1171,7 +1172,7 @@ class GenericParser(MiSeqParser):
                                             rta_completes, analysis_completes)),
                                    columns=['parse_date', 'project', 'run_id', 'run_date', 'run_completion_time',
                                             'run_dir', 'run_dir_create_date', 'num_run_dir',
-                                            'fastq_dir', 'num_fastq_file', 'fastq_dirs_create_date',
+                                            'fastq_dir', 'num_fastq_files', 'fastq_dir_create_date',
                                             'rta_complete', 'analysis_complete'])
 
             # output dirs to csv
@@ -1428,10 +1429,10 @@ class GenericParser(MiSeqParser):
                     copy2(summary_file, output_fastq_dir)
 
                 # add in list of all fastq files for validation server side
-                fastq_sid_df = pd.DataFrame(list(zip(sample_ids, primer_pairs,
+                fastq_sid_df = pd.DataFrame(list(zip(parse_dates, sample_ids, primer_pairs,
                                                      sampleids_primerpairs,
                                                      fastq_create_dates,
-                                                     fastq_sid_fileslist)), columns=['sample_id',
+                                                     fastq_sid_fileslist)), columns=['parse_date', 'sample_id',
                                                                                      'primer_pair',
                                                                                      'sampleid_primerpair',
                                                                                      'fastq_create_date',
