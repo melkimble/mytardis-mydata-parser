@@ -273,14 +273,12 @@ class MiSeqParser:
                  output_dir=settings.MISEQ_UPLOAD_DIR,
                  backup_dir=settings.MISEQ_BACKUP_DIR,
                  extra_backup_dirs=settings.MISEQ_EXTRA_BACKUP_DIRS,
-                 create_fastq_sid_dirs=settings.CREATE_FASTQ_SID_DIRS,
                  log_file_dir=settings.LOG_FILE_DIR,
                  data_directory=settings.MISEQ_DATA_DIRECTORY,
                  folder_structure=settings.FOLDER_STRUCTURE,
                  mytardis_url=settings.MYTARDIS_URL,):
         self.staging_dir = staging_dir
         self.backup_dir = backup_dir
-        self.create_fastq_sid_dirs = create_fastq_sid_dirs
         self.backup_original_dir_name = "Original/"
         self.backup_parsed_dir_name = "Parsed/"
         self.output_dir = output_dir
@@ -612,44 +610,19 @@ class MiSeqParser:
         except Exception as err:
             raise RuntimeError("** Error: parse_fastq_metadata_dirs Failed (" + str(err) + ")")
 
-    def copy2_fastq_sid_dirs(self, fastq_df, fastq_dir, output_fastq_dir, align_subdir_name, sampleids_primerpairs):
+    def copy2_output_fastq_dir(self, fastq_df, output_fastq_dir, align_subdir_name):
         # unique subset of sample_ids in same order as list
-        sampleids_primerpairs_distinct = unique(sampleids_primerpairs)
-        file_count = 0
-        fastq_sid_fileslist = []
-        for sampleid_primerpair in sampleids_primerpairs_distinct:
-            # get filepaths with sampleid in them
-            fastq_sid_df = fastq_df[fastq_df['sampleid_primerpair'] == sampleid_primerpair]
-            for index, row in fastq_sid_df.iterrows():
-                fastq_file = row['fastq_path']
-                output_fastq_sid_dir = output_fastq_dir + sampleid_primerpair + "/"
-                fastq_filename = os.path.basename(fastq_file)
-                base_fastq_filelist = "Fastq_" + align_subdir_name + "/" + sampleid_primerpair + "/" + fastq_filename
-                fastq_sid_fileslist.append(base_fastq_filelist)
-                if not os.path.exists(output_fastq_sid_dir):
-                    os.makedirs(output_fastq_sid_dir)
-                    modify_create_date(fastq_dir, output_fastq_sid_dir)
-                copy2(fastq_file, output_fastq_sid_dir)
-                file_count += 1
-        return fastq_sid_fileslist, file_count
-
-    def copy2_output_fastq_dir(self, fastq_df, output_fastq_dir, align_subdir_name, sampleids_primerpairs):
-        # unique subset of sample_ids in same order as list
-        sampleids_primerpairs_distinct = unique(sampleids_primerpairs)
         file_count = 0
         fastq_sid_fileslist = []
         if not os.path.exists(output_fastq_dir):
             os.makedirs(output_fastq_dir)
-        for sampleid_primerpair in sampleids_primerpairs_distinct:
-            # get filepaths with sampleid in them
-            fastq_sid_df = fastq_df[fastq_df['sampleid_primerpair'] == sampleid_primerpair]
-            for index, row in fastq_sid_df.iterrows():
-                fastq_file = row['fastq_path']
-                fastq_filename = os.path.basename(fastq_file)
-                base_fastq_filelist = "Fastq_" + align_subdir_name + "/" + fastq_filename
-                fastq_sid_fileslist.append(base_fastq_filelist)
-                copy2(fastq_file, output_fastq_dir)
-                file_count += 1
+        for index, row in fastq_df.iterrows():
+            fastq_file = row['fastq_path']
+            fastq_filename = os.path.basename(fastq_file)
+            base_fastq_filelist = "Fastq_" + align_subdir_name + "/" + fastq_filename
+            fastq_sid_fileslist.append(base_fastq_filelist)
+            copy2(fastq_file, output_fastq_dir)
+            file_count += 1
         return fastq_sid_fileslist, file_count
 
     def parse_fastq_files(self, export_csv=True):
@@ -660,7 +633,7 @@ class MiSeqParser:
             api_logger.info('[START] parse_fastq_files')
             dirs_df = self.parse_fastq_metadata_dirs()
             output_dir = self.output_dir
-            create_fastq_sid_dirs = self.create_fastq_sid_dirs
+
             for index, row in dirs_df.iterrows():
                 num_align_subdir = row['num_align_subdir']
                 project = row['project']
@@ -720,16 +693,9 @@ class MiSeqParser:
                                                                   '_filelist_%Y%m%d_%H%M%S.csv')
                     fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
 
-                if create_fastq_sid_dirs:
-                    fastq_sid_fileslist, file_count = self.copy2_fastq_sid_dirs(fastq_df, fastq_dir,
-                                                                                output_fastq_dir,
-                                                                                align_subdir_name,
-                                                                                sampleids_primerpairs)
-                else:
-                    fastq_sid_fileslist, file_count = self.copy2_output_fastq_dir(fastq_df,
-                                                                                  output_fastq_dir,
-                                                                                  align_subdir_name,
-                                                                                  sampleids_primerpairs)
+                fastq_sid_fileslist, file_count = self.copy2_output_fastq_dir(fastq_df,
+                                                                              output_fastq_dir,
+                                                                              align_subdir_name)
 
                 for summary_file in fastq_summary_file_list:
                     # copy summary file into each fastq sampleid_primerpair folder
@@ -1059,21 +1025,18 @@ class GenericParser(MiSeqParser):
                  output_dir=settings.MISEQ_UPLOAD_DIR,
                  backup_dir=settings.MISEQ_BACKUP_DIR,
                  extra_backup_dirs=settings.MISEQ_EXTRA_BACKUP_DIRS,
-                 create_fastq_sid_dirs=settings.CREATE_FASTQ_SID_DIRS,
                  log_file_dir=settings.LOG_FILE_DIR,
                  data_directory=settings.MISEQ_DATA_DIRECTORY,
                  folder_structure=settings.FOLDER_STRUCTURE,
                  mytardis_url=settings.MYTARDIS_URL):
         super().__init__(project, run_dir, num_run_dir, staging_dir, output_dir, backup_dir,
-                         extra_backup_dirs, create_fastq_sid_dirs,
-                         log_file_dir, data_directory, folder_structure, mytardis_url)
+                         extra_backup_dirs, log_file_dir, data_directory, folder_structure, mytardis_url)
         self.staging_dir = staging_dir
         self.backup_dir = backup_dir
         self.backup_original_dir_name = "Original/"
         self.backup_parsed_dir_name = "Parsed/"
         self.output_dir = output_dir
         self.extra_backup_dirs = extra_backup_dirs
-        self.create_fastq_sid_dirs = create_fastq_sid_dirs
         self.log_file_dir = log_file_dir
         # mydata cfgs
         self.data_directory = data_directory
@@ -1355,7 +1318,7 @@ class GenericParser(MiSeqParser):
             api_logger.info('[START] parse_fastq_files')
             dirs_df = self.parse_fastq_metadata_dirs()
             output_dir = self.output_dir
-            create_fastq_sid_dirs = self.create_fastq_sid_dirs
+
             for index, row in dirs_df.iterrows():
                 # num_align_subdir = row['num_align_subdir']
                 project = row['project']
@@ -1374,14 +1337,12 @@ class GenericParser(MiSeqParser):
                     os.makedirs(output_fastq_dir)
                     modify_create_date(fastq_dir, output_fastq_dir)
 
-                fastq_files_list = glob.glob(os.path.join(fastq_dir, '*.fastq.gz'))
+                # recursive list of fastq files
+                fastq_files_list = glob.glob(os.path.join(fastq_dir, '**/*.fastq.gz'), recursive=True)
                 fastq_files_list = [dir_path.replace('\\', '/') for dir_path in fastq_files_list]
-                fastq_summary_file_list = glob.glob(os.path.join(fastq_dir, '*.txt'))
-                fastq_summary_file_list = [dir_path.replace('\\', '/') for dir_path in fastq_summary_file_list]
-
-                # files in run folder to move to run_metadata folder
+                # number of fastq files
                 num_files = len(fastq_files_list)
-                # files in run folder to move to run_metadata folder
+
 
                 # log info
                 api_logger.info('Start copying ' + str(num_files) + ' files')
@@ -1399,6 +1360,7 @@ class GenericParser(MiSeqParser):
                     sample_id = fastq_name.split('_', 1)[0]
                     # if pattern matches, extract sample_id and/or primer_pair
                     sample_id, primer_pair, sampleid_primerpair = get_sampleid_primerpair_name(sample_id)
+
                     parse_dates.append(parse_date)
                     primer_pairs.append(primer_pair)
                     sample_ids.append(sample_id)
@@ -1413,26 +1375,18 @@ class GenericParser(MiSeqParser):
                                                                   '_filelist_%Y%m%d_%H%M%S.csv')
                     fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
 
-                if create_fastq_sid_dirs:
-                    fastq_sid_fileslist, file_count = self.copy2_fastq_sid_dirs(fastq_df, fastq_dir,
-                                                                                output_fastq_dir,
-                                                                                completion_time_fmt,
-                                                                                sampleids_primerpairs)
-                else:
-                    fastq_sid_fileslist, file_count = self.copy2_output_fastq_dir(fastq_df,
-                                                                                  output_fastq_dir,
-                                                                                  completion_time_fmt,
-                                                                                  sampleids_primerpairs)
-
-                for summary_file in fastq_summary_file_list:
-                    # copy summary file into each fastq sampleid_primerpair folder
-                    copy2(summary_file, output_fastq_dir)
+                fastq_sid_fileslist, file_count = self.copy2_output_fastq_dir(fastq_df,
+                                                                              output_fastq_dir,
+                                                                              completion_time_fmt)
 
                 # add in list of all fastq files for validation server side
-                fastq_sid_df = pd.DataFrame(list(zip(parse_dates, sample_ids, primer_pairs,
+                fastq_sid_df = pd.DataFrame(list(zip(parse_dates,
+                                                     sample_ids,
+                                                     primer_pairs,
                                                      sampleids_primerpairs,
                                                      fastq_create_dates,
-                                                     fastq_sid_fileslist)), columns=['parse_date', 'sample_id',
+                                                     fastq_sid_fileslist)), columns=['parse_date',
+                                                                                     'sample_id',
                                                                                      'primer_pair',
                                                                                      'sampleid_primerpair',
                                                                                      'fastq_create_date',
