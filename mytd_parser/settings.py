@@ -5,7 +5,7 @@ LAST MODIFIED: 03/24/2021
 """
 import os
 
-## grab directory of settings.py
+# grab directory of settings.py
 parser_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 BASE_DIR = parser_dir.replace('\\', '/')
 

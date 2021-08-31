@@ -259,4 +259,3 @@ class ServerParse:
             api_logger.info('[END] move_fastq_files')
         except Exception as err:
             raise RuntimeError("** Error: move_fastq_files Failed (" + str(err) + ")")
-
