@@ -342,7 +342,7 @@ class MiSeqParser:
                 # if rta_complete is false, then the run is not complete
                 align_subdir = align_subdir_create_date = num_align_subdir = fastq_dir = \
                     fastq_dir_create_date = "Run Failed"
-                # if Run Failed, then analysis was never complete
+                # if Run Failed, then Sequencing was never complete
                 sequencing_complete = False
 
                 # append to lists
@@ -369,12 +369,12 @@ class MiSeqParser:
                 # grab filepath with "Alignment" in it
                 alignment_dir = [algndir for algndir in alignment_dirs_list if "Alignment" in algndir]
                 if not alignment_dir:
-                    # if there is no Alignment folder, then the analysis did
+                    # if there is no Alignment folder, then the Sequencing did
                     # not complete and there are no Fastq files
                     # append to lists
                     align_subdir = align_subdir_create_date = num_align_subdir = fastq_dir = \
-                        fastq_dir_create_date = "Analysis Incomplete"
-                    # if no alignment folder, then analysis was not complete
+                        fastq_dir_create_date = "Sequencing Incomplete"
+                    # if no alignment folder, then Sequencing was not complete
                     sequencing_complete = False
 
                     # append to lists
@@ -397,7 +397,7 @@ class MiSeqParser:
                 else:
                     # convert list to string
                     alignment_dir = ''.join(alignment_dir)
-                    # there is an analysis folder, then analysis should be complete
+                    # there is an Sequencing folder, then Sequencing should be complete
                     sequencing_complete = True
 
                     align_subdirs_list = glob.glob(os.path.join(alignment_dir, '*/'))
@@ -1132,10 +1132,10 @@ class GenericParser(MiSeqParser):
             fastq_dir = fastq_dir.replace('\\', '/')
 
             if not fastq_dir:
-                # if there are no fastq files, then the analysis did not complete
+                # if there are no fastq files, then the Sequencing did not complete
                 # append to lists
-                fastq_dir = fastq_dir_create_date = "Analysis Incomplete"
-                # if no fastq files, then analysis was not complete
+                fastq_dir = fastq_dir_create_date = "Sequencing Incomplete"
+                # if no fastq files, then Sequencing was not complete
                 sequencing_complete = False
 
                 # append to lists
@@ -1155,7 +1155,7 @@ class GenericParser(MiSeqParser):
                 run_completion_times.append(completion_time)
 
             else:
-                # there are fastq files, then analysis should be complete
+                # there are fastq files, then Sequencing should be complete
                 sequencing_complete = True
                 fastq_dir_create_date = datetime.fromtimestamp(get_creation_dt(fastq_dir)).strftime('%Y-%m-%d %H:%M:%S')
                 # append to lists
