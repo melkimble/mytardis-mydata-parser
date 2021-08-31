@@ -2,7 +2,7 @@
 parse_seq_run.py
 Filter and parse MiSeq Illumina runs and submit data via MyData to MyTardis
 Created By: mkimble
-LAST MODIFIED: 03/24/2021
+LAST MODIFIED: 08/31/2021
 """
 
 from . import settings

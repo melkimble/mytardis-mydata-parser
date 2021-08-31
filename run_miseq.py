@@ -7,7 +7,7 @@
 * Original backup: Backup/Original/{project}/{run_id}/*
 * Parsed backup: Backup/Parsed/{project}/{run_id}/*
 Created By: mkimble
-LAST MODIFIED: 03/24/2021
+LAST MODIFIED: 08/31/2021
 """
 
 from mytd_parser.parse_seq_run import parse_seq_dirs

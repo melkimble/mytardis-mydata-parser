@@ -2,7 +2,7 @@
 parse_server_copy.py
 Filter and parse server copies of MiSeq Illumina runs and reformat for bioinformatics pipelines
 Created By: mkimble
-LAST MODIFIED: 03/24/2021
+LAST MODIFIED: 08/31/2021
 """
 
 from . import settings

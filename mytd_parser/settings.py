@@ -1,7 +1,7 @@
 """
 mytd_parser python settings
 Created By: mkimble
-LAST MODIFIED: 03/24/2021
+LAST MODIFIED: 08/30/2021
 """
 import os
 
