@@ -5,8 +5,6 @@ Created By: mkimble
 LAST MODIFIED: 03/24/2021
 """
 
-from mytd_parser.parse_server_copy import ServerParse
+from mytd_parser.parse_server_copy import server_parse
 
-server_parser = ServerParse()
-
-server_parser.move_fastq_files()
+server_parse()
