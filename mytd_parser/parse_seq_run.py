@@ -448,6 +448,8 @@ class MiSeqParser:
                                             'rta_complete', 'sequencing_complete'])
             # output dirs to csv
             if export_csv:
+                if not os.path.exists(self.log_file_dir):
+                    os.makedirs(self.log_file_dir)
                 output_csv_filename = self.log_file_dir + 'miseq_dirlist.csv'
                 if os.path.exists(output_csv_filename):
                     dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False, header=False, mode='a')
@@ -734,7 +736,11 @@ class MiSeqParser:
                                             columns=['parse_date', 'sample_id', 'primer_pair', 'sampleid_primerpair',
                                                      'fastq_create_date', 'fastq_path'])
                     if export_csv:
-                        output_csv_filename = datetime.now().strftime(self.log_file_dir+'Fastq_' + align_subdir_name +
+                        fastq_filelists_log_dir = self.log_file_dir + 'fastq_filelists/'
+                        if not os.path.exists(fastq_filelists_log_dir):
+                            os.makedirs(fastq_filelists_log_dir)
+
+                        output_csv_filename = datetime.now().strftime(fastq_filelists_log_dir+'Fastq_' + align_subdir_name +
                                                                       '_filelist_%Y%m%d_%H%M%S.csv')
                         fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
 
@@ -1185,6 +1191,8 @@ class GenericParser(MiSeqParser):
 
             # output dirs to csv
             if export_csv:
+                if not os.path.exists(self.log_file_dir):
+                    os.makedirs(self.log_file_dir)
                 output_csv_filename = self.log_file_dir + 'generic_dirlist.csv'
                 if os.path.exists(output_csv_filename):
                     dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False, header=False, mode='a')
@@ -1449,7 +1457,11 @@ class GenericParser(MiSeqParser):
                                             columns=['parse_date', 'sample_id', 'primer_pair', 'sampleid_primerpair',
                                                      'fastq_create_date', 'fastq_path'])
                     if export_csv:
-                        output_csv_filename = datetime.now().strftime(self.log_file_dir + 'Fastq_' + completion_time_fmt +
+                        fastq_filelist_dir = self.log_file_dir + "fastq_filelists/"
+                        if not os.path.exists(fastq_filelist_dir):
+                            os.makedirs(fastq_filelist_dir)
+                        output_csv_filename = datetime.now().strftime(fastq_filelist_dir + 'Fastq_' +
+                                                                      completion_time_fmt +
                                                                       '_filelist_%Y%m%d_%H%M%S.csv')
                         fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
 

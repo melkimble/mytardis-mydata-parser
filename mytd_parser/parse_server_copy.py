@@ -194,6 +194,8 @@ class ServerParse:
                                             'num_fastq_dir', 'rta_complete', 'upload_complete'])
             # output dirs to csv
             if export_csv:
+                if not os.path.exists(self.log_file_dir):
+                    os.makedirs(self.log_file_dir)
                 output_csv_filename = self.log_file_dir + 'server_dirlist.csv'
                 if os.path.exists(output_csv_filename):
                     dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False, header=False, mode='a')
