@@ -252,9 +252,13 @@ def parse_seq_dirs(upload_parsing=False, move_parsing=False, move_staging=False)
             alignment_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
             # convert forward slashes to backwards slashes
             alignment_dirs_list = [dir_path.replace('\\', '/') for dir_path in alignment_dirs_list]
+
+            miseq_run_dirs = ["Alignment", "Data", "Thumbnail_Images", "Config", "InterOp"]
+            check_miseq_dirs = [run_dir for run_dir in alignment_dirs_list if any(ignore in run_dir for ignore in miseq_run_dirs)]
+
             # grab filepath with "Alignment" in it
-            alignment_dir = [algndir for algndir in alignment_dirs_list if "Alignment" in algndir]
-            if not alignment_dir:
+            # alignment_dir = [algndir for algndir in alignment_dirs_list if "Alignment" in algndir]
+            if not check_miseq_dirs:
                 gp = GenericParser(project, run_dir, num_run_dir)
                 dirs_df = gp.parse_fastq_files()
                 upload_action, parsing_action, staging_action = gp.complete_upload_backup(dirs_df, upload_parsing,
@@ -334,7 +338,7 @@ class MiSeqParser:
             fastq_files = glob.glob(os.path.join(run_dir, '**/*.fastq.gz'), recursive=True)
             fastq_files_list = [dir_path.replace('\\', '/') for dir_path in fastq_files]
             num_fastq_file = len(fastq_files_list)
-            if not rta_complete:
+            if not rta_complete or not completion_time:
                 # if rta_complete is false, then the run is not complete
                 align_subdir = align_subdir_create_date = num_align_subdir = fastq_dir = \
                     fastq_dir_create_date = "Run Failed"
@@ -809,12 +813,13 @@ class MiSeqParser:
                 project = row['project']
                 run_id = row['run_id']
                 rta_complete = row['rta_complete']
+                completion_time = row['run_completion_time']
                 api_logger.info('move_parsing_backup: ' + project + ', ' + run_id)
                 input_copy_dir = output_dir + project + "/" + run_id + "/"
 
                 # if rta_complete is false, continue to next item in list
                 # Only runs with rta_complete == True were parsed
-                if not rta_complete:
+                if not rta_complete or not completion_time:
                     api_logger.info('End: RTAComplete.txt does not exist - run was not parsed [' + project + " - " +
                                     run_id + "]")
                 else:
@@ -928,7 +933,7 @@ class MiSeqParser:
             # with rta_complete=False, all directories will be placed into backup
             # But with rta_complete=True, only complete runs will be processed
             # even if run was not successful
-            #dirs_df = self.get_dirs(export_csv=False, rta_complete=True)
+            # dirs_df = self.get_dirs(export_csv=False, rta_complete=True)
             backup_parsed_dir = self.backup_dir+self.backup_parsed_dir_name
             backup_original_dir = self.backup_dir+self.backup_original_dir_name
             if move_parsing and move_staging:
