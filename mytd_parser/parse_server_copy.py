@@ -217,9 +217,9 @@ class ServerParse:
             api_logger.info('[START] create_bioinformatics_results_dir')
             upload_bioinfo_results_dir = self.upload_bioinfo_results_dir
             output_hpc_run_dir = upload_bioinfo_results_dir + project + '/' + run_id + '/Bioinformatics_Results/'
-            api_logger.info('Start create dir: ' + project + ', ' + run_id + ': [' + output_hpc_run_dir + ']')
             if not os.path.exists(output_hpc_run_dir):
                 os.makedirs(output_hpc_run_dir)
+                api_logger.info('Created dir: ' + project + ', ' + run_id + ': [' + output_hpc_run_dir + ']')
             api_logger.info('[END] create_bioinformatics_results_dir')
         except Exception as err:
             raise RuntimeError("** Error: create_bioinformatics_results_dir Failed (" + str(err) + ")")
@@ -253,9 +253,10 @@ class ServerParse:
                         copy2(fastq_file, output_fastq_dir)
                         api_logger.info(str(fastq_filename) + ' moved to [' + str(output_fastq_dir) + ']')
                         fastq_counter += 1
-                    else:
-                        api_logger.info(str(fastq_filename) + ' already in [' + str(output_fastq_dir)+']')
-                api_logger.info('End: moved ' + str(fastq_counter) + ' files')
+                if fastq_counter == 0:
+                    api_logger.info('[ALL ALREADY EXIST] Moved ' + str(fastq_counter) + ' files')
+                else:
+                    api_logger.info('[MOVED] Moved ' + str(fastq_counter) + ' files')
             api_logger.info('[END] move_fastq_files')
         except Exception as err:
             raise RuntimeError("** Error: move_fastq_files Failed (" + str(err) + ")")
