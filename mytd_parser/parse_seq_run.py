@@ -448,8 +448,6 @@ class MiSeqParser:
                                             'rta_complete', 'sequencing_complete'])
             # output dirs to csv
             if export_csv:
-                if not os.path.exists(self.log_file_dir):
-                    os.makedirs(self.log_file_dir)
                 output_csv_filename = self.log_file_dir + 'miseq_dirlist.csv'
                 if os.path.exists(output_csv_filename):
                     dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False, header=False, mode='a')
@@ -739,7 +737,6 @@ class MiSeqParser:
                         fastq_filelists_log_dir = self.log_file_dir + 'fastq_filelists/'
                         if not os.path.exists(fastq_filelists_log_dir):
                             os.makedirs(fastq_filelists_log_dir)
-
                         output_csv_filename = datetime.now().strftime(fastq_filelists_log_dir+'Fastq_' + align_subdir_name +
                                                                       '_filelist_%Y%m%d_%H%M%S.csv')
                         fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
@@ -1191,8 +1188,6 @@ class GenericParser(MiSeqParser):
 
             # output dirs to csv
             if export_csv:
-                if not os.path.exists(self.log_file_dir):
-                    os.makedirs(self.log_file_dir)
                 output_csv_filename = self.log_file_dir + 'generic_dirlist.csv'
                 if os.path.exists(output_csv_filename):
                     dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False, header=False, mode='a')
