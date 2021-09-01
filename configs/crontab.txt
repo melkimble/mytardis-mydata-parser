@@ -1,0 +1,2 @@
+# rclone sync or copy at midnight
+0 0 * * * su your_user_name -c "/path/to/rclone-cron.sh" >> /path/to/cron.log 2>&1
