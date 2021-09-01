@@ -23,7 +23,7 @@ def check_upload_complete(fastq_list_filepath, run_dir):
 
     fastq_list = fastq_list_df['fastq_path'].tolist()
     complete_fastq_list = [run_dir + s for s in fastq_list]
-    api_logger.info(complete_fastq_list)
+    # api_logger.info(complete_fastq_list) # too much to have in log
 
     if all(list(map(os.path.isfile, complete_fastq_list))):
         api_logger.info('[END] check_upload_complete - True')
