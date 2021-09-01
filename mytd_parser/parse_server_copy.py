@@ -24,6 +24,8 @@ def check_upload_complete(fastq_list_filepath, run_dir):
     fastq_list = fastq_list_df['fastq_path'].tolist()
     complete_fastq_list = [run_dir + s for s in fastq_list]
     # api_logger.info(complete_fastq_list) # too much to have in log
+    num_complete = len(complete_fastq_list)
+    api_logger.info('Total fastq files from run: ', str(num_complete))
 
     if all(list(map(os.path.isfile, complete_fastq_list))):
         api_logger.info('[END] check_upload_complete - True')
@@ -242,8 +244,8 @@ class ServerParse:
                     os.makedirs(output_fastq_dir)
                 fastq_files = glob.glob(os.path.join(fastq_dir, '**/*.fastq.gz'), recursive=True)
                 num_fastq_files = len(fastq_files)
-                api_logger.info('Start move: ' + project + ', ' + run_id + ', ' + str(num_fastq_files) +
-                                ' files from: [' + fastq_dir + '], to: [' + output_fastq_dir + ']')
+                api_logger.info('Start move: ' + str(num_fastq_files) + ' fastq files - ' + project + ', ' + run_id +
+                                ', from: [' + fastq_dir + '], to: [' + output_fastq_dir + ']')
                 fastq_counter = 0
                 for fastq_file in fastq_files:
                     fastq_filename = os.path.basename(fastq_file)
