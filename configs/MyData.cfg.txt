@@ -1,0 +1,27 @@
+[MyData]
+instrument_name = your_instrument_name
+facility_name = your_facility_name
+data_directory = /your/upload/directory/
+contact_name = your_contact_name
+contact_email = your_contact_email@email.com
+mytardis_url = https://your_mytardis_url.com
+username = your_mytardis_username
+api_key = your_mytardis_api_key
+folder_structure = User Group / Dataset
+ignore_old_datasets = False
+ignore_interval_number = 0
+ignore_interval_unit = months
+ignore_new_datasets = False
+ignore_new_interval_number = 0
+ignore_new_interval_unit = months
+ignore_new_files = True
+ignore_new_files_minutes = 1
+use_includes_file = False
+use_excludes_file = False
+max_lookup_threads = 1
+max_upload_retries = 1
+validate_folder_structure = True
+verification_delay = 3.0
+cache_datafile_lookups = True
+upload_invalid_user_or_group_folders = True
+connection_timeout = 10.0

@@ -1,0 +1,18 @@
+#!/bin/bash
+if pidof -o %PPID -x “rclone-cron.sh”; then
+exit 1
+fi
+/path/to/rclone copy source:directory/ destination:directory/ -P --update --min-age 15m --exclude "**/Bioinformatics_Results/**" --exclude "**/Thumbnail_Images/**" --exclude "**/Data/**" --log-file=/path/to/wasabi-download.log --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
+
+/path/to/rclone copy source:directory/ destination:directory/ -P --update --min-age 15m --log-file=/path/to/gdrive-upload.log --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
+
+source /path/to/.virtualenvs/venv/bin/activate
+python /path/to/mytardis-mydata-parser/run_server.py
+
+# if files exist that were created within the last 24 hours, then upload to MyTardis
+if find /path/to/server/upload/directory/* -mtime -1 | read
+then
+#mydata scan -v
+mydata upload -v
+fi
+exit
