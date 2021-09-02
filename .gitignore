@@ -123,4 +123,5 @@ dmypy.json
 
 #mydata-python git repo
 /mydata-python/*
+/UoA_MyTardis_Ingestion/*
 /logs/*
