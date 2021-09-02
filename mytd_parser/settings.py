@@ -31,3 +31,14 @@ SERVER_UPLOAD_BR_DIR = "/UMaine2/mytardis_upload/"
 
 # Mydata cfg
 SERVER_DATA_DIRECTORY = SERVER_UPLOAD_BR_DIR
+
+# mytd_api cfg
+MYTARDIS_API_URL = "https://mytardis.maine-edna.org:443/api/v1/"
+MYTARDIS_MODEL_NAME = "dataset"
+MAINE_EDNA_EXPERIMENT_ID = 1
+MYTARDIS_API_USER = os.environ.get('MYTARDIS_API_USER')
+MYTARDIS_API_PASSWORD = os.environ.get('MYTARDIS_API_PASSWORD')
+RCLONE_FILTER_FILE_DIR = BASE_DIR+"/configs/"
+RCLONE_WASABI_FILTER_FILENAME = "filter-wasabi-files"
+MAINE_EDNA_RCLONE_GDRIVE_FILTER_FILENAME = "medna_filter-gdrive-files"
+
