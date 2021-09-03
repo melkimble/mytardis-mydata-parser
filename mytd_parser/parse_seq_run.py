@@ -1158,7 +1158,7 @@ class GenericParser(MiSeqParser):
 
             parse_type = "Generic"
             parse_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            align_subdir, align_subdirs_create_date, num_align_subdir = "Generic"
+            align_subdir = align_subdirs_create_date = num_align_subdir = "Generic"
             # Since run performed by different facility, we are assuming the run was complete
             # since they are sending us the completed files
             rta_complete = True
