@@ -554,7 +554,10 @@ class MiSeqParser:
                     api_logger.info('Start copying ' + str(num_files) + ' files')
                     file_count = 0
                     for file in file_list:
-                        if not os.path.exists(file):
+                        filename = os.path.basename(file)
+                        output_file = output_metadata_dir+filename
+                        # print(out_file)
+                        if not os.path.exists(output_file):
                             copy2(file, output_metadata_dir)
                             file_count += 1
                         # log info
@@ -568,9 +571,11 @@ class MiSeqParser:
                         dir_count = 0
                         for keep_dir in keep_dirs_list:
                             dir_name = Path(keep_dir).name
-                            if not os.path.exists(keep_dir):
-                                copy_tree(keep_dir, output_metadata_dir + dir_name + '/')
-                                modify_create_date(keep_dir, output_metadata_dir + dir_name + '/')
+                            output_dir = output_metadata_dir + dir_name + '/'
+                            # print(out_dir)
+                            if not os.path.exists(output_dir):
+                                copy_tree(keep_dir, output_dir)
+                                modify_create_date(keep_dir, output_dir)
                                 dir_count += 1
                         if dir_count == 0:
                             api_logger.info('[All Exist] End copied ' + str(dir_count) + ' dirs')
@@ -644,7 +649,10 @@ class MiSeqParser:
                         modify_create_date(fastq_dir, output_fastq_metadata_dir)
                     file_count = 0
                     for file in file_list:
-                        if not os.path.exists(file):
+                        filename = os.path.basename(file)
+                        output_file = output_fastq_metadata_dir+filename
+                        # print(output_file)
+                        if not os.path.exists(output_file):
                             copy2(file, output_fastq_metadata_dir)
                             file_count += 1
                     if file_count == 0:
@@ -675,22 +683,24 @@ class MiSeqParser:
     def copy2_output_fastq_dir(self, fastq_df, output_fastq_dir, align_subdir_name):
         # unique subset of sample_ids in same order as list
         file_count = 0
-        fastq_sid_fileslist = []
+        fastq_files_list = []
         if not os.path.exists(output_fastq_dir):
             os.makedirs(output_fastq_dir)
         for index, row in fastq_df.iterrows():
             fastq_file = row['fastq_path']
-            if not os.path.exists(fastq_file):
-                fastq_filename = os.path.basename(fastq_file)
-                base_fastq_filelist = "Fastq_" + align_subdir_name + "/" + fastq_filename
-                fastq_sid_fileslist.append(base_fastq_filelist)
+            fastq_filename = os.path.basename(fastq_file)
+            base_fastq_filelist = "Fastq_" + align_subdir_name + "/" + fastq_filename
+            fastq_files_list.append(base_fastq_filelist)
+            output_fastq = output_fastq_dir + fastq_filename
+            # print(out_fastq)
+            if not os.path.exists(output_fastq):
                 copy2(fastq_file, output_fastq_dir)
                 file_count += 1
         if file_count == 0:
             api_logger.info('[All Exist] copied ' + str(file_count) + ' files')
         else:
             api_logger.info('[MOVED] copied ' + str(file_count) + ' files')
-        return fastq_sid_fileslist, file_count
+        return fastq_files_list, file_count
 
     def parse_fastq_files(self, export_csv=True):
         """
@@ -774,16 +784,16 @@ class MiSeqParser:
                                                                       '_filelist_%Y%m%d_%H%M%S.csv')
                         fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
 
-                    fastq_sid_fileslist, file_count = self.copy2_output_fastq_dir(fastq_df,
-                                                                                  output_fastq_dir,
-                                                                                  align_subdir_name)
+                    fastq_sid_files_list, file_count = self.copy2_output_fastq_dir(fastq_df,
+                                                                                   output_fastq_dir,
+                                                                                   align_subdir_name)
                     for summary_file in fastq_summary_file_list:
                         # copy summary file into each fastq sampleid_primerpair folder
                         copy2(summary_file, output_fastq_dir)
 
                     # add in list of all fastq files for validation server side
                     fastq_sid_df = pd.DataFrame(list(zip(sample_ids, primer_pairs, sampleids_primerpairs,
-                                                         fastq_create_dates, fastq_sid_fileslist)),
+                                                         fastq_create_dates, fastq_sid_files_list)),
                                                 columns=['sample_id', 'primer_pair',
                                                          'sampleid_primerpair', 'fastq_create_date',
                                                          'fastq_path'])
@@ -1521,9 +1531,9 @@ class GenericParser(MiSeqParser):
                                                                       '_filelist_%Y%m%d_%H%M%S.csv')
                         fastq_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
 
-                    fastq_sid_fileslist, file_count = self.copy2_output_fastq_dir(fastq_df,
-                                                                                  output_fastq_dir,
-                                                                                  completion_time_fmt)
+                    fastq_sid_files_list, file_count = self.copy2_output_fastq_dir(fastq_df,
+                                                                                   output_fastq_dir,
+                                                                                   completion_time_fmt)
 
                     # add in list of all fastq files for validation server side
                     fastq_sid_df = pd.DataFrame(list(zip(parse_dates,
@@ -1531,12 +1541,12 @@ class GenericParser(MiSeqParser):
                                                          primer_pairs,
                                                          sampleids_primerpairs,
                                                          fastq_create_dates,
-                                                         fastq_sid_fileslist)), columns=['parse_date',
-                                                                                         'sample_id',
-                                                                                         'primer_pair',
-                                                                                         'sampleid_primerpair',
-                                                                                         'fastq_create_date',
-                                                                                         'fastq_path'])
+                                                         fastq_sid_files_list)), columns=['parse_date',
+                                                                                          'sample_id',
+                                                                                          'primer_pair',
+                                                                                          'sampleid_primerpair',
+                                                                                          'fastq_create_date',
+                                                                                          'fastq_path'])
                     output_csv_filename = output_fastq_dir+'Fastq_filelist.csv'
                     fastq_sid_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
 
