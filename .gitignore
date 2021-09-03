@@ -125,3 +125,4 @@ dmypy.json
 /mydata-python/*
 /UoA_MyTardis_Ingestion/*
 /logs/*
+/configs/medna_filter-gdrive-files.txt
