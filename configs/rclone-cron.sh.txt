@@ -2,12 +2,17 @@
 if pidof -o %PPID -x “rclone-cron.sh”; then
 exit 1
 fi
-/path/to/rclone copy source:directory/ destination:directory/ -P --update --min-age 15m --filter-from /path/to/filter-wasabi-files.txt --log-file=/path/to/wasabi-download.log --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
-
-/path/to/rclone copy source:directory/ destination:directory/ -P --update --min-age 15m --filter-from /path/to/filter-gdrive-files.txt --log-file=/path/to/gdrive-upload.log --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
-
+# activate virtual environment
 source /path/to/.virtualenvs/venv/bin/activate
-python /path/to/mytardis-mydata-parser/run_server.py
+
+# copy wasabi to TACC
+/path/to/rclone copy source:directory/ destination:directory/ -P --update --min-age 15m --filter-from /path/to/filter-wasabi-files.txt --log-file=/path/to/wasabi-download.log --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
+# run_server_parse to check if all fastq from run exist
+python /path/to/mytardis-mydata-parser/run_server_parse.py
+
+# run_mytardis_api to generate list of directories to filter RClone to GDrive by project (maine-edna)
+python /path/to/mytardis-mydata-parser/run_mytardis_api.py
+/path/to/rclone copy source:directory/ destination:directory/ -P --update --min-age 15m --filter-from /path/to/filter-gdrive-files.txt --log-file=/path/to/gdrive-upload.log --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
 
 # if files exist that were created within the last 24 hours, then upload to MyTardis
 if find /path/to/server/upload/directory/* -mtime -1 | read
