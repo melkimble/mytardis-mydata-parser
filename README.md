@@ -18,6 +18,25 @@ parsed and original files to desired backup location.
 4. `cd mydata-python`
 5. `python setup.py install`
 6. Use `mydata config generate` to setup a config file with your MyTardis API key and username
+7. Add environmental variables from `configs/mytd_api_configs.env.txt` to bashrc:
+
+```commandline
+# enter VIM text editor for bashrc
+sudo vim ~/.bashrc
+```
+
+```text
+# Update with your username and password and paste into the bottom of bashrc
+export MYTARDIS_API_USER=your_mytardis_username
+export MYTARDIS_API_PASSWORD=your_mytardis_password
+# save and exit VIM
+:wq!
+```
+
+```commandline
+# load environmental variables
+source ~/.bashrc
+```
 
 Use `python run.py [command]` to run from Windows. Necessary to get around 
 `FileNotFoundError: [WinError 2] The system cannot find the file specified`. 
