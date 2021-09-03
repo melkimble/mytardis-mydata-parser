@@ -81,6 +81,8 @@ class DatasetFilter:
                     dataset_description = each['description']
                     dataset_description_fmt = "+ **/" + dataset_description + "*/**"
                     filter_file.write(dataset_description_fmt+"\n")
+                # last line "exclude all else"
+                filter_file.write("- **")
                 filter_file.close()
             else:
                 api_logger.info('[FAIL] Response: ['+str(response_code)+']')
