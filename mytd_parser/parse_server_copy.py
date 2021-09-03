@@ -188,19 +188,27 @@ class ServerParse:
                                     rta_completes.append(rta_complete)
                                     upload_completes.append(upload_complete)
 
-            dirs_df = pd.DataFrame(list(zip(server_parse_dates, projects, run_completion_times, run_ids, run_dirs, run_dirs_create_dates,
+            dirs_df = pd.DataFrame(list(zip(run_ids, server_parse_dates, projects, run_completion_times, run_dirs, run_dirs_create_dates,
                                             num_run_dirs, fastq_dirs, fastq_dirs_create_dates, num_fastq_dirs,
                                             rta_completes, upload_completes)),
-                                   columns=['server_parse_date', 'project', 'run_completion_time', 'run_id', 'run_dir',
+                                   columns=['run_id', 'server_parse_date', 'project', 'run_completion_time', 'run_dir',
                                             'run_dir_create_date', 'num_run_dir', 'fastq_dir', 'fastq_dir_create_date',
                                             'num_fastq_dir', 'rta_complete', 'upload_complete'])
             # output dirs to csv
             if export_csv:
                 output_csv_filename = self.log_file_dir + 'server_dirlist.csv'
                 if os.path.exists(output_csv_filename):
-                    dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False, header=False, mode='a')
+                    dirs_df_old = pd.read_csv(output_csv_filename)
+                    dirs_df_old = dirs_df_old.set_index('run_id')
+                    dirs_df_id = dirs_df.copy()
+                    dirs_df_id = dirs_df_id.set_index('run_id')
+                    # merge the existing and new dirs_df and update fields based on run_id
+                    dirs_df_new = dirs_df_id.combine_first(dirs_df_old).reset_index()
+                    dirs_df_new.to_csv(output_csv_filename, encoding='utf-8', index=False, header=True)
                 else:
-                    dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
+                    dirs_df_id = dirs_df.copy()
+                    dirs_df_id = dirs_df_id.set_index('run_id')
+                    dirs_df_id.to_csv(output_csv_filename, encoding='utf-8', index=True)
             if complete_upload:
                 # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
                 dirs_df_upload_complete = dirs_df[(dirs_df['rta_complete'] == True) &

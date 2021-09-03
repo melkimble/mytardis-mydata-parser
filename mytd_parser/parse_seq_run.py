@@ -115,7 +115,7 @@ def get_run_id_xml(input_run_dir):
     try:
         import xml.etree.ElementTree as ET
         complete_file_name = 'RunInfo.xml'
-        # grab newest CompletedJobInfo.xml in directory
+        # grab newest RunInfo.xml in directory
         complete_file_path = glob.glob(f'{input_run_dir}/**/{complete_file_name}', recursive=True)
         if complete_file_path:
             complete_file_path = max(complete_file_path)
@@ -142,7 +142,7 @@ def get_run_date_xml(input_run_dir):
     try:
         import xml.etree.ElementTree as ET
         complete_file_name = 'RunInfo.xml'
-        # grab newest CompletedJobInfo.xml in directory
+        # grab newest RunInfo.xml in directory
         complete_file_path = glob.glob(f'{input_run_dir}/**/{complete_file_name}', recursive=True)
         if complete_file_path:
             complete_file_path = max(complete_file_path)
@@ -301,6 +301,7 @@ class MiSeqParser:
          get dirs and put in pandas df
         """
         try:
+            parse_types = []
             parse_dates = []
             run_ids = []
             run_dirs = []
@@ -322,6 +323,7 @@ class MiSeqParser:
             run_dir = self.run_dir
             num_run_dir = self.num_run_dir
 
+            parse_type = "MiSeq"
             parse_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
             # if rta_complete exists, sets variable to True to be filtered on
@@ -346,6 +348,7 @@ class MiSeqParser:
                 sequencing_complete = False
 
                 # append to lists
+                parse_types.append(parse_type)
                 parse_dates.append(parse_date)
                 projects.append(project)
                 run_ids.append(run_id)
@@ -378,6 +381,7 @@ class MiSeqParser:
                     sequencing_complete = False
 
                     # append to lists
+                    parse_types.append(parse_type)
                     parse_dates.append(parse_date)
                     projects.append(project)
                     run_ids.append(run_id)
@@ -419,6 +423,7 @@ class MiSeqParser:
                         # other_dirs = [fqdir for fqdir in fastq_dirs_list if not "Fastq" in fqdir]
 
                         # append to lists
+                        parse_types.append(parse_type)
                         parse_dates.append(parse_date)
                         projects.append(project)
                         run_ids.append(run_id)
@@ -436,23 +441,31 @@ class MiSeqParser:
                         rta_completes.append(rta_complete)
                         sequencing_completes.append(sequencing_complete)
 
-            dirs_df = pd.DataFrame(list(zip(parse_dates, projects, run_ids, run_dates, run_completion_times,
-                                            run_dirs, run_dirs_create_dates, num_run_dirs,
+            dirs_df = pd.DataFrame(list(zip(run_ids, parse_types, parse_dates, projects, run_dates,
+                                            run_completion_times, run_dirs, run_dirs_create_dates, num_run_dirs,
                                             align_subdirs, align_subdirs_create_dates, num_align_subdirs,
                                             fastq_dirs, num_fastq_files, fastq_dirs_create_dates,
                                             rta_completes, sequencing_completes)),
-                                   columns=['parse_date', 'project', 'run_id', 'run_date', 'run_completion_time',
+                                   columns=['run_id', 'parse_type', 'parse_date', 'project', 'run_date', 'run_completion_time',
                                             'run_dir', 'run_dir_create_date', 'num_run_dir',
                                             'align_subdir', 'align_subdir_create_date', 'num_align_subdir',
                                             'fastq_dir', 'num_fastq_files', 'fastq_dir_create_date',
                                             'rta_complete', 'sequencing_complete'])
             # output dirs to csv
             if export_csv:
-                output_csv_filename = self.log_file_dir + 'miseq_dirlist.csv'
+                output_csv_filename = self.log_file_dir + 'seq_dirlist.csv'
                 if os.path.exists(output_csv_filename):
-                    dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False, header=False, mode='a')
+                    dirs_df_old = pd.read_csv(output_csv_filename)
+                    dirs_df_old = dirs_df_old.set_index('run_id')
+                    dirs_df_id = dirs_df.copy()
+                    dirs_df_id = dirs_df_id.set_index('run_id')
+                    # merge the existing and new dirs_df and update fields based on run_id
+                    dirs_df_new = dirs_df_id.combine_first(dirs_df_old).reset_index()
+                    dirs_df_new.to_csv(output_csv_filename, encoding='utf-8', index=False, header=True)
                 else:
-                    dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
+                    dirs_df_id = dirs_df.copy()
+                    dirs_df_id = dirs_df_id.set_index('run_id')
+                    dirs_df_id.to_csv(output_csv_filename, encoding='utf-8', index=True)
             if rta_complete:
                 # subset by directories that have rta_complete.txt; we do not want to process incomplete sequencing runs
                 dirs_df_rta_complete = dirs_df[(dirs_df['rta_complete'] == True) &
@@ -541,21 +554,29 @@ class MiSeqParser:
                     api_logger.info('Start copying ' + str(num_files) + ' files')
                     file_count = 0
                     for file in file_list:
-                        copy2(file, output_metadata_dir)
-                        file_count += 1
+                        if not os.path.exists(file):
+                            copy2(file, output_metadata_dir)
+                            file_count += 1
                         # log info
-                    api_logger.info('End copied ' + str(file_count) + ' files')
+                    if file_count == 0:
+                        api_logger.info('[All Exist] End copied ' + str(file_count) + ' files')
+                    else:
+                        api_logger.info('End copied ' + str(file_count) + ' files')
                     if num_dirs > 0:
                         # if there are directories in list, copy them. Otherwise do nothing.
                         api_logger.info('Start copying ' + str(num_dirs) + ' dirs')
                         dir_count = 0
                         for keep_dir in keep_dirs_list:
                             dir_name = Path(keep_dir).name
-                            copy_tree(keep_dir, output_metadata_dir + dir_name + '/')
-                            modify_create_date(keep_dir, output_metadata_dir + dir_name + '/')
-                            dir_count += 1
-                        # log info
-                        api_logger.info('End copied ' + str(dir_count) + ' dirs')
+                            if not os.path.exists(keep_dir):
+                                copy_tree(keep_dir, output_metadata_dir + dir_name + '/')
+                                modify_create_date(keep_dir, output_metadata_dir + dir_name + '/')
+                                dir_count += 1
+                        if dir_count == 0:
+                            api_logger.info('[All Exist] End copied ' + str(dir_count) + ' dirs')
+                        else:
+                            # log info
+                            api_logger.info('End copied ' + str(dir_count) + ' dirs')
                     if num_align_subdir > 1:
                         # if more than 1 align_subdir, add 1 to counter
                         align_counter += 1
@@ -623,10 +644,14 @@ class MiSeqParser:
                         modify_create_date(fastq_dir, output_fastq_metadata_dir)
                     file_count = 0
                     for file in file_list:
-                        copy2(file, output_fastq_metadata_dir)
-                        file_count += 1
-                    # log info
-                    api_logger.info('End copied ' + str(file_count) + ' files')
+                        if not os.path.exists(file):
+                            copy2(file, output_fastq_metadata_dir)
+                            file_count += 1
+                    if file_count == 0:
+                        api_logger.info('[All Exist] End copied ' + str(file_count) + ' files')
+                    else:
+                        # log info
+                        api_logger.info('End copied ' + str(file_count) + ' files')
                     api_logger.info('Start copying ' + str(num_dirs) + ' dirs')
                     dir_count = 0
                     for keep_dir in keep_dirs_list:
@@ -635,10 +660,13 @@ class MiSeqParser:
                         if not os.path.exists(output_fastq_metadata_subdir):
                             os.makedirs(output_fastq_metadata_subdir)
                             modify_create_date(keep_dir, output_fastq_metadata_subdir)
-                        copy_tree(keep_dir, output_fastq_metadata_subdir)
-                        dir_count += 1
-                    # log info
-                    api_logger.info('End copied ' + str(dir_count) + ' dirs')
+                            copy_tree(keep_dir, output_fastq_metadata_subdir)
+                            dir_count += 1
+                    if dir_count == 0:
+                        api_logger.info('[All Exist] End copied ' + str(dir_count) + ' dirs')
+                    else:
+                        # log info
+                        api_logger.info('End copied ' + str(dir_count) + ' dirs')
             api_logger.info('[END] parse_fastq_metadata_dirs')
             return dirs_df
         except Exception as err:
@@ -652,11 +680,16 @@ class MiSeqParser:
             os.makedirs(output_fastq_dir)
         for index, row in fastq_df.iterrows():
             fastq_file = row['fastq_path']
-            fastq_filename = os.path.basename(fastq_file)
-            base_fastq_filelist = "Fastq_" + align_subdir_name + "/" + fastq_filename
-            fastq_sid_fileslist.append(base_fastq_filelist)
-            copy2(fastq_file, output_fastq_dir)
-            file_count += 1
+            if not os.path.exists(fastq_file):
+                fastq_filename = os.path.basename(fastq_file)
+                base_fastq_filelist = "Fastq_" + align_subdir_name + "/" + fastq_filename
+                fastq_sid_fileslist.append(base_fastq_filelist)
+                copy2(fastq_file, output_fastq_dir)
+                file_count += 1
+        if file_count == 0:
+            api_logger.info('[All Exist] copied ' + str(file_count) + ' files')
+        else:
+            api_logger.info('[MOVED] copied ' + str(file_count) + ' files')
         return fastq_sid_fileslist, file_count
 
     def parse_fastq_files(self, export_csv=True):
@@ -1099,6 +1132,7 @@ class GenericParser(MiSeqParser):
          get dirs and put in pandas df
         """
         try:
+            parse_types = []
             parse_dates = []
             projects = []
             run_ids = []
@@ -1113,11 +1147,18 @@ class GenericParser(MiSeqParser):
             fastq_dirs_create_dates = []
             sequencing_completes = []
 
+            # to combine miseq and generic dirlist into one file, these are included but are filled in as "Generic"
+            align_subdirs = []
+            align_subdirs_create_dates = []
+            num_align_subdirs = []
+
             project = self.project
             run_dir = self.run_dir
             num_run_dir = self.num_run_dir
 
+            parse_type = "Generic"
             parse_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            align_subdir, align_subdirs_create_date, num_align_subdir = "Generic"
             # Since run performed by different facility, we are assuming the run was complete
             # since they are sending us the completed files
             rta_complete = True
@@ -1142,6 +1183,7 @@ class GenericParser(MiSeqParser):
                 sequencing_complete = False
 
                 # append to lists
+                parse_types.append(parse_type)
                 parse_dates.append(parse_date)
                 projects.append(project)
                 run_ids.append(run_id)
@@ -1156,12 +1198,17 @@ class GenericParser(MiSeqParser):
                 num_fastq_files.append(num_fastq_file)
                 run_dates.append(run_date)
                 run_completion_times.append(completion_time)
+
+                align_subdirs.append(align_subdir)
+                align_subdirs_create_dates.append(align_subdirs_create_date)
+                num_align_subdirs.append(num_align_subdir)
 
             else:
                 # there are fastq files, then Sequencing should be complete
                 sequencing_complete = True
                 fastq_dir_create_date = datetime.fromtimestamp(get_creation_dt(fastq_dir)).strftime('%Y-%m-%d %H:%M:%S')
                 # append to lists
+                parse_types.append(parse_type)
                 parse_dates.append(parse_date)
                 projects.append(project)
                 run_ids.append(run_id)
@@ -1177,22 +1224,36 @@ class GenericParser(MiSeqParser):
                 run_dates.append(run_date)
                 run_completion_times.append(completion_time)
 
-            dirs_df = pd.DataFrame(list(zip(parse_dates, projects, run_ids, run_dates, run_completion_times,
-                                            run_dirs, run_dirs_create_dates, num_run_dirs,
+                align_subdirs.append(align_subdir)
+                align_subdirs_create_dates.append(align_subdirs_create_date)
+                num_align_subdirs.append(num_align_subdir)
+
+            dirs_df = pd.DataFrame(list(zip(run_ids, parse_types, parse_dates, projects, run_dates,
+                                            run_completion_times, run_dirs, run_dirs_create_dates, num_run_dirs,
+                                            align_subdirs, align_subdirs_create_dates, num_align_subdirs,
                                             fastq_dirs, num_fastq_files, fastq_dirs_create_dates,
                                             rta_completes, sequencing_completes)),
-                                   columns=['parse_date', 'project', 'run_id', 'run_date', 'run_completion_time',
+                                   columns=['run_id', 'parse_type', 'parse_date', 'project', 'run_date', 'run_completion_time',
                                             'run_dir', 'run_dir_create_date', 'num_run_dir',
+                                            'align_subdir', 'align_subdir_create_date', 'num_align_subdir',
                                             'fastq_dir', 'num_fastq_files', 'fastq_dir_create_date',
                                             'rta_complete', 'sequencing_complete'])
 
             # output dirs to csv
             if export_csv:
-                output_csv_filename = self.log_file_dir + 'generic_dirlist.csv'
+                output_csv_filename = self.log_file_dir + 'seq_dirlist.csv'
                 if os.path.exists(output_csv_filename):
-                    dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False, header=False, mode='a')
+                    dirs_df_old = pd.read_csv(output_csv_filename)
+                    dirs_df_old = dirs_df_old.set_index('run_id')
+                    dirs_df_id = dirs_df.copy()
+                    dirs_df_id = dirs_df_id.set_index('run_id')
+                    # merge the existing and new dirs_df and update fields based on run_id
+                    dirs_df_new = dirs_df_id.combine_first(dirs_df_old).reset_index()
+                    dirs_df_new.to_csv(output_csv_filename, encoding='utf-8', index=False, header=True)
                 else:
-                    dirs_df.to_csv(output_csv_filename, encoding='utf-8', index=False)
+                    dirs_df_id = dirs_df.copy()
+                    dirs_df_id = dirs_df_id.set_index('run_id')
+                    dirs_df_id.to_csv(output_csv_filename, encoding='utf-8', index=True)
             if rta_complete:
                 # subset by directories that have RTAComplete.txt; we do not want to process incomplete sequencing runs
                 dirs_df_rta_complete = dirs_df[(dirs_df['rta_complete'] == True) &
