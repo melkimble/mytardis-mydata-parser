@@ -37,9 +37,14 @@ class DatasetFilter:
             api_logger.info('get_response: [' + str(uri) + ']')
             response = requests.get(uri, auth=(mytardis_api_user, mytardis_api_password))
             api_logger.info('response: [' + str(response) + ']')
-            data_json = response.json()
-            #api_logger.info('data_json: [' + str(data_json) + ']')
-            return data_json
+            # checks if response is not 4xx or 5xx
+            if response.ok:
+                data_json = response.json()
+                # api_logger.info('data_json: [' + str(data_json) + ']')
+                return data_json, response.status_code
+            else:
+                return False, response.status_code
+
         except Exception as err:
             raise RuntimeError("** Error: get_response Failed (" + str(err) + ")")
 
@@ -53,8 +58,11 @@ class DatasetFilter:
 
             urn = self.get_urn(model_name, params_dict)
             uri = self.get_uri(mytardis_api_url, urn)
-            data_json = self.get_response(uri, mytardis_api_user, mytardis_api_password)
-            return data_json
+            data_json, response_code = self.get_response(uri, mytardis_api_user, mytardis_api_password)
+            if data_json:
+                return data_json, response_code
+            else:
+                return False, response_code
         except Exception as err:
             raise RuntimeError("** Error: make_filter_request Failed (" + str(err) + ")")
 
@@ -66,12 +74,15 @@ class DatasetFilter:
 
             api_logger.info('write_filter_file: [' + str(output_filter_file) + ']')
 
-            data_json = self.make_filter_request()
-            filter_file = open(output_filter_file, 'w')
-            for each in data_json['objects']:
-                dataset_description = each['description']
-                dataset_description_fmt = "+ **/" + dataset_description + "/**"
-                filter_file.write(dataset_description_fmt+"\n")
-            filter_file.close()
+            data_json, response_code = self.make_filter_request()
+            if data_json:
+                filter_file = open(output_filter_file, 'w')
+                for each in data_json['objects']:
+                    dataset_description = each['description']
+                    dataset_description_fmt = "+ **/" + dataset_description + "*/**"
+                    filter_file.write(dataset_description_fmt+"\n")
+                filter_file.close()
+            else:
+                api_logger.info('[FAIL] Response: ['+str(response_code)+']')
         except Exception as err:
             raise RuntimeError("** Error: write_filter_file Failed (" + str(err) + ")")
