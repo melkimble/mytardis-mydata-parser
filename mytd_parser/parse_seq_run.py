@@ -283,8 +283,8 @@ class MiSeqParser:
                  mytardis_url=settings.MYTARDIS_URL,):
         self.staging_dir = staging_dir
         self.backup_dir = backup_dir
-        self.backup_original_dir_name = "Original/"
-        self.backup_parsed_dir_name = "Parsed/"
+        self.backup_staging_dir_name = "Staging/"
+        self.backup_upload_dir_name = "Upload/"
         self.output_dir = output_dir
         self.extra_backup_dirs = extra_backup_dirs
         self.log_file_dir = log_file_dir
@@ -888,7 +888,7 @@ class MiSeqParser:
         try:
             api_logger.info('[START] move_parsing_backup')
             output_dir = self.output_dir
-            backup_parsed_dir = self.backup_dir + self.backup_parsed_dir_name
+            backup_upload_dir = self.backup_dir + self.backup_upload_dir_name
             extra_backup_dirs = self.extra_backup_dirs
 
             dirs_group_df = dirs_df.groupby(['project', 'run_id', 'rta_complete']).size().reset_index().rename(columns={0: 'count'})
@@ -909,11 +909,11 @@ class MiSeqParser:
                     api_logger.info('End: RTAComplete.txt does not exist - run was not parsed [' + project + " - " +
                                     run_id + "]")
                 else:
-                    output_move_dir = backup_parsed_dir + project + "/" + run_id + "/"
+                    output_move_dir = backup_upload_dir + project + "/" + run_id + "/"
                     backup_parsing_dirs.append(output_move_dir)
                     if extra_backup_dirs:
                         for extra_backup_dir in extra_backup_dirs:
-                            output_backup_dir = extra_backup_dir + self.backup_parsed_dir_name + project + "/" + \
+                            output_backup_dir = extra_backup_dir + self.backup_upload_dir_name + project + "/" + \
                                                 run_id + "/"
                             backup_parsing_dirs.append(output_backup_dir)
                             # copy into each extra backup directory
@@ -958,7 +958,7 @@ class MiSeqParser:
         try:
             api_logger.info('[START] move_staging_backup')
             staging_dir = self.staging_dir
-            backup_original_dir = self.backup_dir + self.backup_original_dir_name
+            backup_staging_dir = self.backup_dir + self.backup_staging_dir_name
             extra_backup_dirs = self.extra_backup_dirs
             dirs_group_df = dirs_df.groupby(['project', 'run_id']).size().reset_index().rename(columns={0: 'count'})
             backup_staging_dirs = []
@@ -967,13 +967,13 @@ class MiSeqParser:
                 project = row['project']
                 run_id = row['run_id']
                 input_copy_dir = staging_dir + project + "/" + run_id + "/"
-                output_move_dir = backup_original_dir + project + "/" + run_id + "/"
+                output_move_dir = backup_staging_dir + project + "/" + run_id + "/"
                 api_logger.info('Start: backup move - from: [' + input_copy_dir+'], to: [' + output_move_dir+']')
                 backup_staging_dirs.append(output_move_dir)
                 if extra_backup_dirs:
                     for extra_backup_dir in extra_backup_dirs:
                         # copy into each extra backup directory
-                        output_backup_dir = extra_backup_dir + self.backup_original_dir_name + project + "/" + \
+                        output_backup_dir = extra_backup_dir + self.backup_staging_dir_name + project + "/" + \
                                             run_id + "/"
                         backup_staging_dirs.append(output_backup_dir)
                         api_logger.info('Start: backup copy - from: [' + input_copy_dir + '], to: [' +
@@ -1020,29 +1020,29 @@ class MiSeqParser:
             # But with rta_complete=True, only complete runs will be processed
             # even if run was not successful
             # dirs_df = self.get_dirs(export_csv=False, rta_complete=True)
-            backup_parsed_dir = self.backup_dir+self.backup_parsed_dir_name
-            backup_original_dir = self.backup_dir+self.backup_original_dir_name
+            backup_upload_dir = self.backup_dir+self.backup_upload_dir_name
+            backup_staging_dir = self.backup_dir+self.backup_staging_dir_name
             if move_parsing and move_staging:
                 backup_parsing_dirs_str = self.move_parsing_backup(dirs_df, upload_parsing)
                 backup_staging_dirs_str = self.move_staging_backup(dirs_df, upload_parsing)
-                api_logger.info('Backup made of parsed and original [' + backup_parsed_dir + ', ' +
-                                backup_original_dir + ']')
+                api_logger.info('Backup made of parsed and original [' + backup_upload_dir + ', ' +
+                                backup_staging_dir + ']')
                 parsing_action = "Parsed data moved to backup dir(s): [" + backup_parsing_dirs_str + "]"
                 staging_action = "Original data moved to backup dir(s): [" + backup_staging_dirs_str + "]"
             elif move_parsing and not move_staging:
                 backup_parsing_dirs_str = self.move_parsing_backup(dirs_df, upload_parsing)
-                api_logger.info('Backup made of parsed [' + backup_parsed_dir + ']')
+                api_logger.info('Backup made of parsed [' + backup_upload_dir + ']')
                 parsing_action = "Parsed data moved to backup dir(s): [" + backup_parsing_dirs_str + "]"
-                staging_action = "Original data left in staging dir: [" + backup_parsed_dir + "]"
+                staging_action = "Original data left in staging dir: [" + backup_upload_dir + "]"
             elif not move_parsing and move_staging:
                 backup_staging_dirs_str = self.move_staging_backup(dirs_df, upload_parsing)
-                api_logger.info('Backup made of original [' + backup_original_dir + ']')
-                parsing_action = "Parsed data left in upload dir: [" + backup_original_dir + "]"
-                staging_action = "Original data moved to backup dir(s): [" + backup_staging_dirs_str + "]"
+                api_logger.info('Backup made of original [' + backup_staging_dir + ']')
+                parsing_action = "Parsed data left in upload dir: [" + backup_staging_dir + "]"
+                staging_action = "staging data moved to backup dir(s): [" + backup_staging_dirs_str + "]"
             elif not move_parsing and not move_staging:
-                api_logger.info('No backup created [' + backup_parsed_dir + ', ' + backup_original_dir + ']')
-                parsing_action = "Parsed data left in upload dir: [" + backup_parsed_dir + "]"
-                staging_action = "Original data left in staging dir: [" + backup_original_dir + "]"
+                api_logger.info('No backup created [' + backup_upload_dir + ', ' + backup_staging_dir + ']')
+                parsing_action = "Parsed data left in upload dir: [" + backup_upload_dir + "]"
+                staging_action = "Original data left in staging dir: [" + backup_staging_dir + "]"
             api_logger.info('[END] complete_upload_backup')
             return upload_action, parsing_action, staging_action
         except Exception as err:
@@ -1124,8 +1124,8 @@ class GenericParser(MiSeqParser):
                          extra_backup_dirs, log_file_dir, data_directory, folder_structure, mytardis_url)
         self.staging_dir = staging_dir
         self.backup_dir = backup_dir
-        self.backup_original_dir_name = "Original/"
-        self.backup_parsed_dir_name = "Parsed/"
+        self.backup_staging_dir_name = "Staging/"
+        self.backup_upload_dir_name = "Upload/"
         self.output_dir = output_dir
         self.extra_backup_dirs = extra_backup_dirs
         self.log_file_dir = log_file_dir
