@@ -56,6 +56,8 @@ class DatasetFilter:
             mytardis_api_user = self.mytardis_api_user
             mytardis_api_password = self.mytardis_api_password
 
+            api_logger.info('make_filter_request: [' + str(mytardis_api_url) + ', ' + str(mytardis_api_user) + ']')
+
             urn = self.get_urn(model_name, params_dict)
             uri = self.get_uri(mytardis_api_url, urn)
             data_json, response_code = self.get_response(uri, mytardis_api_user, mytardis_api_password)

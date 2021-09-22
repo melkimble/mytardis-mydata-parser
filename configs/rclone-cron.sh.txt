@@ -2,6 +2,10 @@
 if pidof -o %PPID -x “rclone-cron.sh”; then
 exit 1
 fi
+
+# source environmental variables
+source /path/to/.bashrc
+
 # activate virtual environment
 source /path/to/.virtualenvs/venv/bin/activate
 

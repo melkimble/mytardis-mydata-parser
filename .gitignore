@@ -126,3 +126,6 @@ dmypy.json
 /UoA_MyTardis_Ingestion/*
 /logs/*
 /configs/medna_filter-gdrive-files.txt
+/configs/MyData.cfg
+/configs/mytd_api_configs.env
+/configs/rclone-cron.sh
