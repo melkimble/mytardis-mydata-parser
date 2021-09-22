@@ -22,24 +22,21 @@ parsed and original files to desired backup location.
 
 ```commandline
 # enter VIM text editor for bashrc
-sudo vim ~/.bashrc
+sudo vim ~/.profile
 ```
 
 ```text
-# Update with your username and password and paste into the bottom of bashrc
+# Update with your username and password and paste into the bottom of profile
 export MYTARDIS_API_USER=your_mytardis_username
 export MYTARDIS_API_PASSWORD=your_mytardis_password
 # save and exit VIM
 :wq!
 ```
 
-```commandline
-# load environmental variables
-source ~/.bashrc
-```
+Normally we would use ~/.bashrc, but since we are running a non-interactive shell, bashrc will not source.
+To avoid this issue, the environmental variables are set in ~/.profile and sourced from within `rclone-cron.sh`.
 
 Use `python run.py [command]` to run from Windows. Necessary to get around 
 `FileNotFoundError: [WinError 2] The system cannot find the file specified`. 
 Files missing from `python setup.py install` for Windows. 
 To uninstall, run `pip uninstall mydata-python`.
-

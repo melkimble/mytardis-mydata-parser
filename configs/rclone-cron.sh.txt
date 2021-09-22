@@ -1,27 +1,46 @@
 #!/bin/bash
-if pidof -o %PPID -x “rclone-cron.sh”; then
-exit 1
+CRON_SCRIPT=“rclone-cron.sh”
+# check if script is already running, if it is exit
+if pidof -o %PPID -x "$CRON_SCRIPT"; then
+        exit 1
 fi
+
+# set variables
+HOME_DIR=/path/to/home/dir
+PROFILE_PATH=${HOME_DIR}/.profile
+VENV_PATH=/path/to/.virtualenvs/venv/bin/activate
+RCLONE_PATH=/path/to/rclone
+UPLOAD_DIR=/path/to/upload/dir
+WASABI_FILTER_FILE=${HOME_DIR}/mytardis-mydata-parser/configs/filter-wasabi-files.txt
+WASABI_LOG_FILE=${HOME_DIR}/wasabi-download.log
+MEDNA_GDRIVE_FILTER_FILE=${HOME_DIR}/mytardis-mydata-parser/configs/medna_filter-gdrive-files.txt
+GDRIVE_LOG_FILE=${HOME_DIR}/gdrive-upload.log
+
+cd $HOME_DIR
 
 # source environmental variables
-source /path/to/.bashrc
+source $PROFILE_PATH
 
 # activate virtual environment
-source /path/to/.virtualenvs/venv/bin/activate
+source $VENV_PATH
 
 # copy wasabi to TACC
-/path/to/rclone copy source:directory/ destination:directory/ -P --update --min-age 15m --filter-from /path/to/filter-wasabi-files.txt --log-file=/path/to/wasabi-download.log --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
+$RCLONE_PATH copy source:directory/ destination:directory/ -P --update --min-age 15m --filter-from $WASABI_FILTER_FILE --log-file=$WASABI_LOG_FILE --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
 # run_server_parse to check if all fastq from run exist
-python /path/to/mytardis-mydata-parser/run_server_parse.py
+python ${HOME_DIR}/mytardis-mydata-parser/run_server_parse.py
 
 # run_mytardis_api to generate list of directories to filter RClone to GDrive by project (maine-edna)
-python /path/to/mytardis-mydata-parser/run_mytardis_api.py
-/path/to/rclone copy source:directory/ destination:directory/ -P --update --min-age 15m --filter-from /path/to/filter-gdrive-files.txt --log-file=/path/to/gdrive-upload.log --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
+python ${HOME_DIR}/mytardis-mydata-parser/run_mytardis_api.py
+# copy wasabi to gdrive based on dataset filter
+$RCLONE_PATH copy source:directory/ destination:directory/ -P --update --min-age 15m --filter-from $MEDNA_GDRIVE_FILTER_FILE --log-file=$GDRIVE_LOG_FILE --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
 
-# if files exist that were created within the last 24 hours, then upload to MyTardis
-if find /path/to/server/upload/directory/* -mtime -1 | read
-then
-#mydata scan -v
-mydata upload -v
+# cd into upload directory
+cd $UPLOAD_DIR
+# if files exist that were created within the last 24 hours, then upload to mytardis
+if find "$UPLOAD_DIR" -type f -mtime -1 | read; then
+        #mydata scan -v
+        mydata upload -v
 fi
+# return to home directory
+cd $HOME_DIR
 exit
