@@ -18,7 +18,8 @@ parsed and original files to desired backup location.
 4. `cd mydata-python`
 5. `python setup.py install`
 6. Use `mydata config generate` to setup a config file with your MyTardis API key and username
-7. Add environmental variables from `configs/mytd_api_configs.env.txt` to bashrc:
+7. Install and setup rclone (instructions: https://blog.spatialmsk.com/cloud-storage-sync/)
+8. Add environmental variables from `configs/mytd_api_configs.env.txt` to bashrc:
 
 ```commandline
 # enter VIM text editor for bashrc
