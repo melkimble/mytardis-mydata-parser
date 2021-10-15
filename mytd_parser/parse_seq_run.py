@@ -92,17 +92,36 @@ def check_rta_complete(input_run_dir):
         rta_file_name = glob.glob(f'{input_run_dir}/**/{rta_file_name}', recursive=True)
         if rta_file_name:
             print(rta_file_name)
+            rta_complete_time = get_rta_complete_time(rta_file_name)
             api_logger.info('End: RTAComplete.txt exists')
-            return True
+            return True, rta_complete_time
         else:
             print(rta_file_name)
             # if RTAComplete.txt does not exist, then we do not want to proceed with processing
             # the sequencing run.
             api_logger.info('End: RTAComplete.txt does not exist - sequencing run not complete')
-            return False
+            return False, False
 
     except Exception as err:
         raise RuntimeError("** Error: check_rta_complete Failed (" + str(err) + ")")
+
+
+def get_rta_complete_time(rta_file_name):
+    """
+     get completion date time from RTAComplete.txt
+    """
+    try:
+        # input_run_dir = staging_dir + project + "/" + run_id + "/"
+        api_logger.info('get_rta_complete_time: [' + str(rta_file_name)+']')
+        # unlist rta filename
+        rta_file_name = rta_file_name[0]
+        rta_df = pd.read_csv(rta_file_name, sep=',', header=None)
+        # format as datetime
+        rta_complete_time = pd.to_datetime(rta_df.iloc[0][0] + ' ' + rta_df.iloc[0][1])
+        api_logger.info('rta_complete_time: [' + str(rta_complete_time) + ']')
+        return rta_complete_time
+    except Exception as err:
+        raise RuntimeError("** Error: get_rta_complete_time Failed (" + str(err) + ")")
 
 
 def get_run_id_xml(input_run_dir):
@@ -134,7 +153,7 @@ def get_run_id_xml(input_run_dir):
 
 def get_run_date_xml(input_run_dir):
     """
-     parse CompletedJobInfo.xml to get correct run date
+     parse RunInfo.xml to get correct run date
      If data are sent multiple times via MyData, mydata-seq-fac will append
      the folder with "-1"; this way the referenced run id is always the correct run id
      for data on the server.
@@ -180,7 +199,9 @@ def get_run_completion_time_xml(input_run_dir):
             for run_info in root.findall("CompletionTime"):
                 completion_time = run_info.text
                 # print(completion_time)
-            return completion_time
+            completion_time_dt = dateutil.parser.parse(completion_time)
+            completion_time_fmt = completion_time_dt.strftime('%Y-%m-%d %H:%M:%S')  # '20201224_211251'
+            return completion_time_fmt
         else:
             api_logger.info("CompletedJobInfo.xml Missing")
             return False
@@ -310,6 +331,7 @@ class MiSeqParser:
             projects = []
             num_align_subdirs = []
             rta_completes = []
+            rta_complete_times = []
             run_dates = []
             run_completion_times = []
             num_fastq_files = []
@@ -328,7 +350,7 @@ class MiSeqParser:
 
             # if rta_complete exists, sets variable to True to be filtered on
             # to only process rta_complete directories
-            rta_complete = check_rta_complete(run_dir)
+            rta_complete, rta_complete_time = check_rta_complete(run_dir)
             # run_id = Path(run_dir).name
             # grab run_id and run_date from RunInfo.xml
             run_id = get_run_id_xml(run_dir)
@@ -340,7 +362,7 @@ class MiSeqParser:
             fastq_files = glob.glob(os.path.join(run_dir, '**/*.fastq.gz'), recursive=True)
             fastq_files_list = [dir_path.replace('\\', '/') for dir_path in fastq_files]
             num_fastq_file = len(fastq_files_list)
-            if not rta_complete or not completion_time:
+            if not rta_complete:
                 # if rta_complete is false, then the run is not complete
                 align_subdir = align_subdir_create_date = num_align_subdir = fastq_dir = \
                     fastq_dir_create_date = "Run Failed"
@@ -364,6 +386,7 @@ class MiSeqParser:
                 fastq_dirs.append(fastq_dir)
                 fastq_dirs_create_dates.append(fastq_dir_create_date)
                 rta_completes.append(rta_complete)
+                rta_complete_times.append(rta_complete_time)
                 sequencing_completes.append(sequencing_complete)
             else:
                 alignment_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
@@ -397,6 +420,7 @@ class MiSeqParser:
                     fastq_dirs.append(fastq_dir)
                     fastq_dirs_create_dates.append(fastq_dir_create_date)
                     rta_completes.append(rta_complete)
+                    rta_complete_times.append(rta_complete_time)
                     sequencing_completes.append(sequencing_complete)
                 else:
                     # convert list to string
@@ -439,18 +463,20 @@ class MiSeqParser:
                         fastq_dirs.append(fastq_dir)
                         fastq_dirs_create_dates.append(fastq_dir_create_date)
                         rta_completes.append(rta_complete)
+                        rta_complete_times.append(rta_complete_time)
                         sequencing_completes.append(sequencing_complete)
 
             dirs_df = pd.DataFrame(list(zip(run_ids, parse_types, parse_dates, projects, run_dates,
                                             run_completion_times, run_dirs, run_dirs_create_dates, num_run_dirs,
                                             align_subdirs, align_subdirs_create_dates, num_align_subdirs,
                                             fastq_dirs, num_fastq_files, fastq_dirs_create_dates,
-                                            rta_completes, sequencing_completes)),
-                                   columns=['run_id', 'parse_type', 'parse_date', 'project', 'run_date', 'run_completion_time',
+                                            rta_completes, rta_complete_times, sequencing_completes)),
+                                   columns=['run_id', 'parse_type', 'parse_date', 'project', 'run_date',
+                                            'run_completion_time',
                                             'run_dir', 'run_dir_create_date', 'num_run_dir',
                                             'align_subdir', 'align_subdir_create_date', 'num_align_subdir',
                                             'fastq_dir', 'num_fastq_files', 'fastq_dir_create_date',
-                                            'rta_complete', 'sequencing_complete'])
+                                            'rta_complete', 'rta_complete_time', 'sequencing_complete'])
             # output dirs to csv
             if export_csv:
                 output_csv_filename = self.log_file_dir + 'seq_dirlist.csv'
@@ -495,11 +521,13 @@ class MiSeqParser:
                 # check if run complete
                 completion_time = row['run_completion_time']
                 rta_complete = row['rta_complete']
+                rta_complete_time = row['rta_complete_time']
                 sequencing_complete = row['sequencing_complete']
 
-                if not completion_time or not rta_complete or not sequencing_complete:
+                if not rta_complete or not sequencing_complete:
                     # log info
-                    api_logger.info('[INCOMPLETE RUN] copy_metadata_dirs: ' + project + ', ' + run_id + ', [' + align_subdir + ', ' +
+                    api_logger.info('[INCOMPLETE RUN] copy_metadata_dirs: ' + project + ', ' + run_id +
+                                    ', [' + align_subdir + ', ' +
                                     fastq_dir + '], Num Subalign: ' + str(num_align_subdir))
                     continue
                 else:
@@ -514,7 +542,7 @@ class MiSeqParser:
                     project = row['project']
                     run_dir = row['run_dir']
                     run_id = row['run_id']
-                    run_dir_create_date = row['run_dir_create_date']
+                    fastq_dir_create_date = row['fastq_dir_create_date']
                     align_subdir = row['align_subdir']
                     fastq_dir = row['fastq_dir']
                     # log info
@@ -607,18 +635,21 @@ class MiSeqParser:
                 fastq_dir = row['fastq_dir']
 
                 # check if run complete
+                rta_complete_time = row['rta_complete_time']
                 completion_time = row['run_completion_time']
                 rta_complete = row['rta_complete']
                 sequencing_complete = row['sequencing_complete']
 
-                if not completion_time or not rta_complete or not sequencing_complete:
+                if not rta_complete or not sequencing_complete:
                     # log info
-                    api_logger.info('[INCOMPLETE RUN] parse_fastq_metadata_dirs: ' + project + ', ' + run_id + ', [' + align_subdir + ', ' +
+                    api_logger.info('[INCOMPLETE RUN] parse_fastq_metadata_dirs: ' + project + ', ' + run_id +
+                                    ', [' + align_subdir + ', ' +
                                     fastq_dir + '], Num Subalign: ' + str(num_align_subdir))
                     continue
                 else:
                     # log info
-                    api_logger.info('parse_fastq_metadata_dirs: ' + project + ', ' + run_id + ', [' + align_subdir + ', ' +
+                    api_logger.info('parse_fastq_metadata_dirs: ' + project + ', ' + run_id + ', [' + align_subdir +
+                                    ', ' +
                                     fastq_dir + '], ' + str(num_align_subdir))
                     output_metadata_dir = output_dir + project + "/" + run_id + "/run_metadata_" + run_id + "/"
                     align_subdir_list = glob.glob(os.path.join(align_subdir, '*/'))
@@ -719,11 +750,12 @@ class MiSeqParser:
                 fastq_dir = row['fastq_dir']
 
                 # check if run complete
+                rta_complete_time = row['rta_complete_time']
                 completion_time = row['run_completion_time']
                 rta_complete = row['rta_complete']
                 sequencing_complete = row['sequencing_complete']
 
-                if not completion_time or not rta_complete or not sequencing_complete:
+                if not rta_complete or not sequencing_complete:
                     # log info
                     api_logger.info('[INCOMPLETE RUN] parse_fastq_files: ' + project + ', ' + run_id + ', [' + align_subdir + ', ' +
                                     fastq_dir + '], Num Subalign: ' + str(num_align_subdir))
@@ -905,7 +937,7 @@ class MiSeqParser:
 
                 # if rta_complete is false, continue to next item in list
                 # Only runs with rta_complete == True were parsed
-                if not rta_complete or not completion_time:
+                if not rta_complete:
                     api_logger.info('End: RTAComplete.txt does not exist - run was not parsed [' + project + " - " +
                                     run_id + "]")
                 else:
@@ -1150,6 +1182,7 @@ class GenericParser(MiSeqParser):
             fastq_dirs = []
             num_fastq_files = []
             rta_completes = []
+            rta_complete_times = []
             num_run_dirs = []
             run_dates = []
             run_completion_times = []
@@ -1170,8 +1203,8 @@ class GenericParser(MiSeqParser):
             parse_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             align_subdir = align_subdirs_create_date = num_align_subdir = "Generic"
             # Since run performed by different facility, we are assuming the run was complete
-            # since they are sending us the completed files
-            rta_complete = True
+            # since they are sending us the completed files - but we also want to grab the datetime
+            rta_complete, rta_complete_time = check_rta_complete(run_dir)
             # grab run_id from RunInfo.xml
             run_id = get_run_id_xml(run_dir)
             run_date = get_run_date_xml(run_dir)
@@ -1203,6 +1236,7 @@ class GenericParser(MiSeqParser):
                 fastq_dirs.append(fastq_dir)
                 fastq_dirs_create_dates.append(fastq_dir_create_date)
                 rta_completes.append(rta_complete)
+                rta_complete_times.append(rta_complete_time)
                 sequencing_completes.append(sequencing_complete)
 
                 num_fastq_files.append(num_fastq_file)
@@ -1228,6 +1262,7 @@ class GenericParser(MiSeqParser):
                 fastq_dirs.append(fastq_dir)
                 fastq_dirs_create_dates.append(fastq_dir_create_date)
                 rta_completes.append(rta_complete)
+                rta_complete_times.append(rta_complete_time)
                 sequencing_completes.append(sequencing_complete)
 
                 num_fastq_files.append(num_fastq_file)
@@ -1242,12 +1277,13 @@ class GenericParser(MiSeqParser):
                                             run_completion_times, run_dirs, run_dirs_create_dates, num_run_dirs,
                                             align_subdirs, align_subdirs_create_dates, num_align_subdirs,
                                             fastq_dirs, num_fastq_files, fastq_dirs_create_dates,
-                                            rta_completes, sequencing_completes)),
-                                   columns=['run_id', 'parse_type', 'parse_date', 'project', 'run_date', 'run_completion_time',
+                                            rta_completes, rta_complete_times, sequencing_completes)),
+                                   columns=['run_id', 'parse_type', 'parse_date', 'project', 'run_date',
+                                            'run_completion_time',
                                             'run_dir', 'run_dir_create_date', 'num_run_dir',
                                             'align_subdir', 'align_subdir_create_date', 'num_align_subdir',
                                             'fastq_dir', 'num_fastq_files', 'fastq_dir_create_date',
-                                            'rta_complete', 'sequencing_complete'])
+                                            'rta_complete', 'rta_complete_time', 'sequencing_complete'])
 
             # output dirs to csv
             if export_csv:
@@ -1286,22 +1322,25 @@ class GenericParser(MiSeqParser):
                 project = row['project']
                 run_dir = row['run_dir']
                 run_id = row['run_id']
-                run_dir_create_date = row['run_dir_create_date']
+                fastq_dir_create_date = row['fastq_dir_create_date']
                 fastq_dir = row['fastq_dir']
 
                 # check if run complete
                 completion_time = row['run_completion_time']
                 rta_complete = row['rta_complete']
+                rta_complete_time = row['rta_complete_time']
                 sequencing_complete = row['sequencing_complete']
 
-                if not completion_time or not rta_complete or not sequencing_complete:
+                if not rta_complete or not sequencing_complete:
                     # log info
                     api_logger.info('[INCOMPLETE RUN] copy_metadata_dirs: ' + project + ', ' + run_id + ', [' +
                                     fastq_dir + ']')
                     continue
                 else:
-                    completion_time_dt = dateutil.parser.parse(completion_time)
-                    completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+                    if not completion_time:
+                        completion_time_fmt = rta_complete_time.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+                    else:
+                        completion_time_fmt = completion_time.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
 
                     fastq_ignore_dir = "Fastq_"+completion_time_fmt + "/"
 
@@ -1379,19 +1418,22 @@ class GenericParser(MiSeqParser):
                 fastq_dir = row['fastq_dir']
 
                 # check if run complete
+                fastq_dir_create_date = row['fastq_dir_create_date']
                 completion_time = row['run_completion_time']
                 rta_complete = row['rta_complete']
+                rta_complete_time = row['rta_complete_time']
                 sequencing_complete = row['sequencing_complete']
 
-                if not completion_time or not rta_complete or not sequencing_complete:
+                if not rta_complete or not sequencing_complete:
                     # log info
                     api_logger.info('[INCOMPLETE RUN] parse_fastq_metadata_dirs: ' + project + ', ' + run_id + ', [' +
                                     fastq_dir + ']')
                     continue
                 else:
-                    completion_time_dt = dateutil.parser.parse(completion_time)
-                    completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
-
+                    if not completion_time:
+                        completion_time_fmt = rta_complete_time.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+                    else:
+                        completion_time_fmt = completion_time.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
                     # log info
                     api_logger.info('parse_fastq_metadata_dirs: ' + project + ', ' + run_id + ', [' + fastq_dir + ']')
 
@@ -1468,18 +1510,22 @@ class GenericParser(MiSeqParser):
                 fastq_dir = row['fastq_dir']
 
                 # check if run complete
+                fastq_dir_create_date = row['fastq_dir_create_date']
                 completion_time = row['run_completion_time']
                 rta_complete = row['rta_complete']
+                rta_complete_time = row['rta_complete_time']
                 sequencing_complete = row['sequencing_complete']
 
-                if not completion_time or not rta_complete or not sequencing_complete:
+                if not rta_complete or not sequencing_complete:
                     # log info
                     api_logger.info('[INCOMPLETE RUN] parse_fastq_files: ' + project + ', ' + run_id + ', [' +
                                     fastq_dir + ']')
                     continue
                 else:
-                    completion_time_dt = dateutil.parser.parse(completion_time)
-                    completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+                    if not completion_time:
+                        completion_time_fmt = rta_complete_time.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+                    else:
+                        completion_time_fmt = completion_time.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
                     # log info
                     api_logger.info('parse_fastq_files: ' + project + ', ' + run_id + ', [' + fastq_dir + '] ')
                     # use formatted name completion time for fastq filename. completion_time_fmt ==> "20201224_205858"
