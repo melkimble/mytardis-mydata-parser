@@ -170,6 +170,7 @@ def get_run_date_xml(input_run_dir):
             root = tree.getroot()
             for run_info in root.findall("./Run"):
                 run_date = run_info.find('Date').text
+                api_logger.info('run_date: [' + str(run_date) + ']')
                 # print(run_date)
             return run_date
         else:
@@ -200,7 +201,8 @@ def get_run_completion_time_xml(input_run_dir):
                 completion_time = run_info.text
                 # print(completion_time)
             completion_time_dt = dateutil.parser.parse(completion_time)
-            completion_time_fmt = completion_time_dt.strftime('%Y-%m-%d %H:%M:%S')  # '20201224_211251'
+            completion_time_fmt = completion_time_dt.strftime('%Y-%m-%d %H:%M:%S')
+            api_logger.info('get_run_completion_time_xml: [' + str(completion_time_fmt) + ']')
             return completion_time_fmt
         else:
             api_logger.info("CompletedJobInfo.xml Missing")
