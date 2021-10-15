@@ -193,6 +193,7 @@ def get_run_completion_time_xml(input_run_dir):
         # grab newest CompletedJobInfo.xml in directory
         complete_file_path = glob.glob(f'{input_run_dir}/**/{complete_file_name}', recursive=True)
         if complete_file_path:
+            api_logger.info('CompletedJobInfo: [' + str(complete_file_path) + ']')
             complete_file_path = max(complete_file_path)
             complete_file_path = complete_file_path.replace('\\', '/')
             tree = ET.parse(complete_file_path)
