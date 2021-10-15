@@ -1341,9 +1341,11 @@ class GenericParser(MiSeqParser):
                     continue
                 else:
                     if not completion_time:
-                        completion_time_fmt = rta_complete_time.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+                        completion_time_dt = datetime.datetime.strptime(rta_complete_time, '%Y-%m-%d %H:%M:%S')
+                        completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
                     else:
-                        completion_time_fmt = completion_time.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+                        completion_time_dt = datetime.datetime.strptime(completion_time, '%Y-%m-%d %H:%M:%S')
+                        completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
 
                     fastq_ignore_dir = "Fastq_"+completion_time_fmt + "/"
 
@@ -1434,9 +1436,11 @@ class GenericParser(MiSeqParser):
                     continue
                 else:
                     if not completion_time:
-                        completion_time_fmt = rta_complete_time.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+                        completion_time_dt = datetime.datetime.strptime(rta_complete_time, '%Y-%m-%d %H:%M:%S')
+                        completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
                     else:
-                        completion_time_fmt = completion_time.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+                        completion_time_dt = datetime.datetime.strptime(completion_time, '%Y-%m-%d %H:%M:%S')
+                        completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
                     # log info
                     api_logger.info('parse_fastq_metadata_dirs: ' + project + ', ' + run_id + ', [' + fastq_dir + ']')
 
@@ -1526,9 +1530,11 @@ class GenericParser(MiSeqParser):
                     continue
                 else:
                     if not completion_time:
-                        completion_time_fmt = rta_complete_time.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+                        completion_time_dt = datetime.datetime.strptime(rta_complete_time, '%Y-%m-%d %H:%M:%S')
+                        completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
                     else:
-                        completion_time_fmt = completion_time.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
+                        completion_time_dt = datetime.datetime.strptime(completion_time, '%Y-%m-%d %H:%M:%S')
+                        completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
                     # log info
                     api_logger.info('parse_fastq_files: ' + project + ', ' + run_id + ', [' + fastq_dir + '] ')
                     # use formatted name completion time for fastq filename. completion_time_fmt ==> "20201224_205858"
