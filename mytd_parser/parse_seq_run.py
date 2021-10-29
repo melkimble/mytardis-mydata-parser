@@ -292,7 +292,7 @@ def parse_seq_dirs(upload_parsing=False, move_parsing=False, move_staging=False)
                 dirs_df = mp.parse_fastq_files()
                 upload_action, parsing_action, staging_action = mp.complete_upload_backup(dirs_df, upload_parsing,
                                                                                           move_parsing, move_staging)
-    show_complete_dialog(upload_action, parsing_action, staging_action)
+    #show_complete_dialog(upload_action, parsing_action, staging_action)
 
 
 class MiSeqParser:
