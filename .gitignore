@@ -130,4 +130,6 @@ dmypy.json
 /configs/mytd_api_configs.env
 /configs/rclone-cron.sh
 /configs/survey123-fefda012b951.json
-/configs/settings.py
+/configs/fastqupload-settings.py
+/configs/tacc-settings.py
+/configs/miseq-settings.py
