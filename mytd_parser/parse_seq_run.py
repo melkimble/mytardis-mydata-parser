@@ -1359,6 +1359,8 @@ class GenericParser(MiSeqParser):
             api_logger.info('[START] copy_metadata_dirs')
             dirs_df = self.get_dirs(export_csv=True, rta_complete=True)
             output_dir = self.output_dir
+            check_gdrive = self.check_gdrive
+
             for index, row in dirs_df.iterrows():
                 project = row['project']
                 run_dir = row['run_dir']
@@ -1371,6 +1373,18 @@ class GenericParser(MiSeqParser):
                 rta_complete = row['rta_complete']
                 rta_complete_time = row['rta_complete_time']
                 sequencing_complete = row['sequencing_complete']
+
+                # check if gdrive upload complete
+                num_fastq_files = row['num_fastq_files']
+
+                if check_gdrive:
+                    num_fastq_gsheets = get_fastq_num_runid_gsheets(run_id)
+                    if str(num_fastq_gsheets) != str(num_fastq_files):
+                        # log info
+                        api_logger.info('[INCOMPLETE RUN] parse_fastq_files (num_fastq_gsheets): ' +
+                                        project + ', ' + run_id + ', [' + fastq_dir + ', ' +
+                                        str(num_fastq_files) + 'of ' + str(num_fastq_gsheets) + ']')
+                        continue
 
                 if not rta_complete or not sequencing_complete:
                     # log info
@@ -1453,6 +1467,7 @@ class GenericParser(MiSeqParser):
             api_logger.info('[START] parse_fastq_metadata_dirs')
             dirs_df = self.copy_metadata_dirs(ignore_dirs=True)
             output_dir = self.output_dir
+            check_gdrive = self.check_gdrive
             for index, row in dirs_df.iterrows():
                 # num_align_subdir = row['num_align_subdir']
                 project = row['project']
@@ -1466,6 +1481,18 @@ class GenericParser(MiSeqParser):
                 rta_complete = row['rta_complete']
                 rta_complete_time = row['rta_complete_time']
                 sequencing_complete = row['sequencing_complete']
+
+                # check if gdrive upload complete
+                num_fastq_files = row['num_fastq_files']
+
+                if check_gdrive:
+                    num_fastq_gsheets = get_fastq_num_runid_gsheets(run_id)
+                    if str(num_fastq_gsheets) != str(num_fastq_files):
+                        # log info
+                        api_logger.info('[INCOMPLETE RUN] parse_fastq_files (num_fastq_gsheets): ' +
+                                        project + ', ' + run_id + ', [' + fastq_dir + ', ' +
+                                        str(num_fastq_files) + 'of ' + str(num_fastq_gsheets) + ']')
+                        continue
 
                 if not rta_complete or not sequencing_complete:
                     # log info
@@ -1551,13 +1578,8 @@ class GenericParser(MiSeqParser):
             for index, row in dirs_df.iterrows():
                 # num_align_subdir = row['num_align_subdir']
                 project = row['project']
-                run_id = row['run_id']
                 # align_subdir = row['align_subdir']
                 fastq_dir = row['fastq_dir']
-
-                # check if gdrive upload complete
-                num_fastq_files = row['num_fastq_files']
-
                 # check if run complete
                 fastq_dir_create_date = row['fastq_dir_create_date']
                 completion_time = row['run_completion_time']
@@ -1565,18 +1587,23 @@ class GenericParser(MiSeqParser):
                 rta_complete_time = row['rta_complete_time']
                 sequencing_complete = row['sequencing_complete']
 
+                # check if gdrive upload complete
+                num_fastq_files = row['num_fastq_files']
+                run_id = row['run_id']
+
                 if check_gdrive:
                     num_fastq_gsheets = get_fastq_num_runid_gsheets(run_id)
                     if str(num_fastq_gsheets) != str(num_fastq_files):
                         # log info
-                        api_logger.info('[INCOMPLETE RUN] parse_fastq_files (num_fastq_gsheets): ' + project + ', ' + run_id + ', [' +
-                                        fastq_dir + ', ' + str(num_fastq_gsheets) + 'of ' + str(num_fastq_files) + ']')
+                        api_logger.info('[INCOMPLETE RUN] parse_fastq_files (num_fastq_gsheets): ' +
+                                        project + ', ' + run_id + ', [' + fastq_dir + ', ' +
+                                        str(num_fastq_files) + 'of ' + str(num_fastq_gsheets) + ']')
                         continue
 
                 if not rta_complete or not sequencing_complete:
                     # log info
-                    api_logger.info('[INCOMPLETE RUN] parse_fastq_files (rta_complete): ' + project + ', ' + run_id + ', [' +
-                                    fastq_dir + ']')
+                    api_logger.info('[INCOMPLETE RUN] parse_fastq_files (rta_complete): ' + project + ', ' +
+                                    run_id + ', [' + fastq_dir + ']')
                     continue
                 else:
                     if not completion_time:
