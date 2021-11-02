@@ -129,3 +129,5 @@ dmypy.json
 /configs/MyData.cfg
 /configs/mytd_api_configs.env
 /configs/rclone-cron.sh
+/configs/survey123-fefda012b951.json
+/configs/settings.py

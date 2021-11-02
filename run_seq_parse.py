@@ -16,7 +16,7 @@ from mytd_parser.parse_seq_run import parse_seq_dirs
 # for generic & MiSeq run outputs from other facilities
 # parse runs in /Staging directory
 # Read parsed runs in /Upload directory, upload to MyData, and move parsed files and original files to /Backup directory
-parse_seq_dirs(upload_parsing=False, move_parsing=False, move_staging=False)
+parse_seq_dirs(upload_parsing=False, move_parsing=False, move_staging=False, check_gdrive=False)
 
 
 

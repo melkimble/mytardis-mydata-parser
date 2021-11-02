@@ -19,6 +19,9 @@ from datetime import datetime
 import platform
 import pathlib
 import dateutil.parser
+# for google sheets
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 
 def unique(list):
@@ -213,39 +216,70 @@ def get_run_completion_time_xml(input_run_dir):
 
 
 def get_sampleid_primerpair_name(sample_id):
-    # Illumina MiSeq converts underscores to dashes
-    # e.g., a sample_id 'eSG_L01_19w_001' will be converted to eSG-L01-19w-001
-    # so here it is being converted back to 'eSG_L01_19w_001' if it is a sample_id > 14
-    if len(sample_id) > 14:
-        # check if sample_id matches pattern
-        pattern = "[a-z][A-Z][A-Z]-[A-Z][0-9][0-9]-[0-9][0-9][a-z]-[0-9][0-9][0-9][0-9]+"
-        matched = re.match(pattern, sample_id)
-        is_match = bool(matched)
-        # check if there is a pattern match to naming conventions
-        if is_match:
-            pattern_dash = "[a-z][A-Z][A-Z]-[A-Z][0-9][0-9]-[0-9][0-9][a-z]-[0-9][0-9][0-9][0-9]-+"
-            matched = re.match(pattern_dash, sample_id)
+    try:
+        # Illumina MiSeq converts underscores to dashes
+        # e.g., a sample_id 'eSG_L01_19w_001' will be converted to eSG-L01-19w-001
+        # so here it is being converted back to 'eSG_L01_19w_001' if it is a sample_id > 14
+        if len(sample_id) > 14:
+            # check if sample_id matches pattern
+            pattern = "[a-z][A-Z][A-Z]-[A-Z][0-9][0-9]-[0-9][0-9][a-z]-[0-9][0-9][0-9][0-9]+"
+            matched = re.match(pattern, sample_id)
             is_match = bool(matched)
-            # check if there is a pattern match to naming conventions that also includes a primer pair
+            # check if there is a pattern match to naming conventions
             if is_match:
-                # split based on the pattern so that only things after the pattern are extracted
-                # e.g., eSG-L01-19w-001-+ anything beyond the last dash, in eSG-L01-19w-001-riaz, it would
-                # be riaz
-                primer_pair = re.split(pattern_dash, sample_id)[1]
-                sample_id = sample_id.replace("-" + primer_pair, '')
-                sample_id = sample_id.replace("-", "_")
-                sampleid_primerpair = sample_id+"-"+primer_pair
+                pattern_dash = "[a-z][A-Z][A-Z]-[A-Z][0-9][0-9]-[0-9][0-9][a-z]-[0-9][0-9][0-9][0-9]-+"
+                matched = re.match(pattern_dash, sample_id)
+                is_match = bool(matched)
+                # check if there is a pattern match to naming conventions that also includes a primer pair
+                if is_match:
+                    # split based on the pattern so that only things after the pattern are extracted
+                    # e.g., eSG-L01-19w-001-+ anything beyond the last dash, in eSG-L01-19w-001-riaz, it would
+                    # be riaz
+                    primer_pair = re.split(pattern_dash, sample_id)[1]
+                    sample_id = sample_id.replace("-" + primer_pair, '')
+                    sample_id = sample_id.replace("-", "_")
+                    sampleid_primerpair = sample_id+"-"+primer_pair
+                else:
+                    primer_pair = ''
+                    sample_id = sample_id.replace("-", "_")
+                    sampleid_primerpair = sample_id
             else:
                 primer_pair = ''
-                sample_id = sample_id.replace("-", "_")
                 sampleid_primerpair = sample_id
         else:
             primer_pair = ''
             sampleid_primerpair = sample_id
-    else:
-        primer_pair = ''
-        sampleid_primerpair = sample_id
-    return sample_id, primer_pair, sampleid_primerpair
+        return sample_id, primer_pair, sampleid_primerpair
+    except Exception as err:
+        raise RuntimeError("** Error: get_sampleid_primerpair_name Failed (" + str(err) + ")")
+
+
+def get_fastq_num_runid_gsheets(run_id):
+    try:
+        gdrive_private_key = settings.GDRIVE_PRIVATE_KEY
+        target_spreadsheet_name = settings.GSHEETS_SPREADSHEET_URL
+
+        scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
+                 "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
+        # JSON API file from google drive API
+        credentials = ServiceAccountCredentials.from_json_keyfile_name(gdrive_private_key, scope)
+        gc = gspread.authorize(credentials)
+
+        spreadsheet = gc.open_by_url(target_spreadsheet_name)
+
+        worksheet = spreadsheet.worksheet("Form Responses 1")
+
+        # finding the cell with the header "number of fastq files" gives us the column
+        fastq_cell = worksheet.find("Number of FASTQ files")
+        # finding the cell that matches the RunID of the parsed run gives us the row
+        runid_cell = worksheet.find(run_id)
+
+        # value at cell that matches row, col
+        num_fastq_gsheets = worksheet.cell(runid_cell.row, fastq_cell.col).value
+
+        return num_fastq_gsheets
+    except Exception as err:
+        raise RuntimeError("** Error: get_fastq_num_runid_gsheets Failed (" + str(err) + ")")
 
 
 def show_complete_dialog(upload_action, parsing_action, staging_action):
@@ -259,40 +293,43 @@ def show_complete_dialog(upload_action, parsing_action, staging_action):
     tk.mainloop()
 
 
-def parse_seq_dirs(upload_parsing=False, move_parsing=False, move_staging=False):
-    project_dirs = glob.glob(os.path.join(settings.MISEQ_STAGING_DIR, '*/'))
+def parse_seq_dirs(upload_parsing=False, move_parsing=False, move_staging=False, check_gdrive=False):
+    try:
+        project_dirs = glob.glob(os.path.join(settings.MISEQ_STAGING_DIR, '*/'))
 
-    for project_dir in project_dirs:
-        dir_length = len(os.listdir(project_dir))
-        # if there are no files in the directory, skip processing it
-        if dir_length == 0:
-            continue
-        project = Path(project_dir).name
-        run_dir_list = glob.glob(os.path.join(project_dir, '*/'))
-        run_dir_list = [dir_path.replace('\\', '/') for dir_path in run_dir_list]
-        for run_dir in run_dir_list:
-            # the number of sequencing runs per project
-            num_run_dir = len(run_dir_list)
-            alignment_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
-            # convert forward slashes to backwards slashes
-            alignment_dirs_list = [dir_path.replace('\\', '/') for dir_path in alignment_dirs_list]
+        for project_dir in project_dirs:
+            dir_length = len(os.listdir(project_dir))
+            # if there are no files in the directory, skip processing it
+            if dir_length == 0:
+                continue
+            project = Path(project_dir).name
+            run_dir_list = glob.glob(os.path.join(project_dir, '*/'))
+            run_dir_list = [dir_path.replace('\\', '/') for dir_path in run_dir_list]
+            for run_dir in run_dir_list:
+                # the number of sequencing runs per project
+                num_run_dir = len(run_dir_list)
+                alignment_dirs_list = glob.glob(os.path.join(run_dir, '*/'))
+                # convert forward slashes to backwards slashes
+                alignment_dirs_list = [dir_path.replace('\\', '/') for dir_path in alignment_dirs_list]
 
-            miseq_run_dirs = ["Alignment", "Data", "Thumbnail_Images", "Config", "InterOp"]
-            check_miseq_dirs = [run_dir for run_dir in alignment_dirs_list if any(ignore in run_dir for ignore in miseq_run_dirs)]
+                miseq_run_dirs = ["Alignment", "Data", "Thumbnail_Images", "Config", "InterOp"]
+                check_miseq_dirs = [run_dir for run_dir in alignment_dirs_list if any(ignore in run_dir for ignore in miseq_run_dirs)]
 
-            # grab filepath with "Alignment" in it
-            # alignment_dir = [algndir for algndir in alignment_dirs_list if "Alignment" in algndir]
-            if not check_miseq_dirs:
-                gp = GenericParser(project, run_dir, num_run_dir)
-                dirs_df = gp.parse_fastq_files()
-                upload_action, parsing_action, staging_action = gp.complete_upload_backup(dirs_df, upload_parsing,
-                                                                                          move_parsing, move_staging)
-            else:
-                mp = MiSeqParser(project, run_dir, num_run_dir)
-                dirs_df = mp.parse_fastq_files()
-                upload_action, parsing_action, staging_action = mp.complete_upload_backup(dirs_df, upload_parsing,
-                                                                                          move_parsing, move_staging)
-    #show_complete_dialog(upload_action, parsing_action, staging_action)
+                # grab filepath with "Alignment" in it
+                # alignment_dir = [algndir for algndir in alignment_dirs_list if "Alignment" in algndir]
+                if not check_miseq_dirs:
+                    gp = GenericParser(project, run_dir, num_run_dir, check_gdrive)
+                    dirs_df = gp.parse_fastq_files()
+                    upload_action, parsing_action, staging_action = gp.complete_upload_backup(dirs_df, upload_parsing,
+                                                                                              move_parsing, move_staging)
+                else:
+                    mp = MiSeqParser(project, run_dir, num_run_dir)
+                    dirs_df = mp.parse_fastq_files()
+                    upload_action, parsing_action, staging_action = mp.complete_upload_backup(dirs_df, upload_parsing,
+                                                                                              move_parsing, move_staging)
+        #show_complete_dialog(upload_action, parsing_action, staging_action)
+    except Exception as err:
+        raise RuntimeError("** Error: parse_seq_dirs Failed (" + str(err) + ")")
 
 
 class MiSeqParser:
@@ -1146,7 +1183,7 @@ class MiSeqParser:
 
 
 class GenericParser(MiSeqParser):
-    def __init__(self, project, run_dir, num_run_dir,
+    def __init__(self, project, run_dir, num_run_dir, check_gdrive,
                  staging_dir=settings.MISEQ_STAGING_DIR,
                  output_dir=settings.MISEQ_UPLOAD_DIR,
                  backup_dir=settings.MISEQ_BACKUP_DIR,
@@ -1155,7 +1192,7 @@ class GenericParser(MiSeqParser):
                  data_directory=settings.MISEQ_DATA_DIRECTORY,
                  folder_structure=settings.FOLDER_STRUCTURE,
                  mytardis_url=settings.MYTARDIS_URL):
-        super().__init__(project, run_dir, num_run_dir, staging_dir, output_dir, backup_dir,
+        super().__init__(project, run_dir, num_run_dir, check_gdrive, staging_dir, output_dir, backup_dir,
                          extra_backup_dirs, log_file_dir, data_directory, folder_structure, mytardis_url)
         self.staging_dir = staging_dir
         self.backup_dir = backup_dir
@@ -1171,6 +1208,7 @@ class GenericParser(MiSeqParser):
         self.project = project
         self.run_dir = run_dir
         self.num_run_dir = num_run_dir
+        self.check_gdrive = check_gdrive
 
     def get_dirs(self, export_csv=True, rta_complete=True):
         """
@@ -1508,6 +1546,7 @@ class GenericParser(MiSeqParser):
             api_logger.info('[START] parse_fastq_files')
             dirs_df = self.parse_fastq_metadata_dirs()
             output_dir = self.output_dir
+            check_gdrive = self.check_gdrive
 
             for index, row in dirs_df.iterrows():
                 # num_align_subdir = row['num_align_subdir']
@@ -1516,6 +1555,9 @@ class GenericParser(MiSeqParser):
                 # align_subdir = row['align_subdir']
                 fastq_dir = row['fastq_dir']
 
+                # check if gdrive upload complete
+                num_fastq_files = row['num_fastq_files']
+
                 # check if run complete
                 fastq_dir_create_date = row['fastq_dir_create_date']
                 completion_time = row['run_completion_time']
@@ -1523,9 +1565,17 @@ class GenericParser(MiSeqParser):
                 rta_complete_time = row['rta_complete_time']
                 sequencing_complete = row['sequencing_complete']
 
+                if check_gdrive:
+                    num_fastq_gsheets = get_fastq_num_runid_gsheets(run_id)
+                    if str(num_fastq_gsheets) != str(num_fastq_files):
+                        # log info
+                        api_logger.info('[INCOMPLETE RUN] parse_fastq_files (num_fastq_gsheets): ' + project + ', ' + run_id + ', [' +
+                                        fastq_dir + ', ' + str(num_fastq_gsheets) + 'of ' + str(num_fastq_files) + ']')
+                        continue
+
                 if not rta_complete or not sequencing_complete:
                     # log info
-                    api_logger.info('[INCOMPLETE RUN] parse_fastq_files: ' + project + ', ' + run_id + ', [' +
+                    api_logger.info('[INCOMPLETE RUN] parse_fastq_files (rta_complete): ' + project + ', ' + run_id + ', [' +
                                     fastq_dir + ']')
                     continue
                 else:
