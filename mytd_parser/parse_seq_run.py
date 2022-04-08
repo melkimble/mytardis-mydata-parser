@@ -122,7 +122,7 @@ def get_rta_complete_time(rta_file_name):
         # format as datetime
         rta_complete_time = pd.to_datetime(rta_df.iloc[0][0] + ' ' + rta_df.iloc[0][1])
         api_logger.info('rta_complete_time: [' + str(rta_complete_time) + ']')
-        return rta_complete_time
+        return str(rta_complete_time)
     except Exception as err:
         raise RuntimeError("** Error: get_rta_complete_time Failed (" + str(err) + ")")
 
