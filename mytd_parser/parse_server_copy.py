@@ -100,7 +100,7 @@ class ServerParse:
                     # grab run_id from CompleteJobInfo.xml
                     run_id = get_run_id_xml(run_dir)
                     run_dir_create_date = datetime.fromtimestamp(get_creation_dt(run_dir)).strftime('%Y-%m-%d %H:%M:%S')
-                    if not rta_complete or not completion_time:
+                    if not rta_complete:
                         # if rta_complete is false, then the run is not complete
                         fastq_dir = fastq_dir_create_date = num_fastq_dir = "Upload Incomplete"
                         # if Run Failed, then analysis was never complete
