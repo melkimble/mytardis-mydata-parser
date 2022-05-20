@@ -126,10 +126,13 @@ dmypy.json
 /UoA_MyTardis_Ingestion/*
 /logs/*
 /configs/medna_filter-gdrive-files.txt
-/configs/MyData.cfg
-/configs/mytd_api_configs.env
-/configs/rclone-cron.sh
-/configs/survey123-fefda012b951.json
-/configs/fastqupload-settings.py
-/configs/tacc-settings.py
-/configs/miseq-settings.py
+/git-ignore/MyData.cfg
+/git-ignore/mytd_api_configs.env
+/git-ignore/rclone-cron.sh
+/git-ignore/survey123-fefda012b951.json
+/git-ignore/fastqupload-settings.py
+/git-ignore/tacc-settings.py
+/git-ignore/miseq-settings.py
+
+# ignore all files added to git-ignore
+git-ignore/
