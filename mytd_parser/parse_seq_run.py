@@ -1445,7 +1445,8 @@ class GenericParser(MiSeqParser):
                     continue
                 else:
                     if not completion_time:
-                        completion_time_dt = datetime.strptime(rta_complete_time, '%Y-%m-%d %H:%M:%S')
+                        # completion_time_dt = datetime.strptime(rta_complete_time, '%Y-%m-%d %H:%M:%S')
+                        completion_time_dt = rta_complete_time
                         completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
                     else:
                         completion_time_dt = datetime.strptime(completion_time, '%Y-%m-%d %H:%M:%S')
@@ -1556,7 +1557,8 @@ class GenericParser(MiSeqParser):
                     continue
                 else:
                     if not completion_time:
-                        completion_time_dt = datetime.strptime(rta_complete_time, '%Y-%m-%d %H:%M:%S')
+                        # completion_time_dt = datetime.strptime(rta_complete_time, '%Y-%m-%d %H:%M:%S')
+                        completion_time_dt = rta_complete_time
                         completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
                     else:
                         completion_time_dt = datetime.strptime(completion_time, '%Y-%m-%d %H:%M:%S')
@@ -1665,7 +1667,8 @@ class GenericParser(MiSeqParser):
                     continue
                 else:
                     if not completion_time:
-                        completion_time_dt = datetime.strptime(rta_complete_time, '%Y-%m-%d %H:%M:%S')
+                        # completion_time_dt = datetime.strptime(rta_complete_time, '%Y-%m-%d %H:%M:%S')
+                        completion_time_dt = rta_complete_time
                         completion_time_fmt = completion_time_dt.strftime('%Y%m%d_%H%M%S')  # '20201224_211251'
                     else:
                         completion_time_dt = datetime.strptime(completion_time, '%Y-%m-%d %H:%M:%S')
