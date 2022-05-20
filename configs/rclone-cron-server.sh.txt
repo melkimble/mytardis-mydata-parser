@@ -1,0 +1,67 @@
+#!/bin/bash
+CRON_SCRIPT=“rclone-cron-server.sh”
+# check if script is already running, if it is exit
+if pidof -o %PPID -x "$CRON_SCRIPT"; then
+        exit 1
+fi
+
+echo "${0}: [$(date -u)] ***START rclone-cron-server.sh"
+
+# set variablesi
+HOME_DIR=/home/fastq
+PROFILE_PATH=${HOME_DIR}/.profile
+VENV_PATH=${HOME_DIR}/.virtualenvs/fastq-env/bin/activate
+RCLONE_PATH=${HOME_DIR}/rclone/rclone
+DOWNLOAD_DIR=${HOME_DIR}/FastqQAQC
+UPLOAD_DIR=${HOME_DIR}/FastqUpload
+GDRIVE_DOWNLOAD_LOG_FILE=${HOME_DIR}/gdrive-download.log
+
+# if upload directory doesn't exist, create it
+if [ ! -d "$UPLOAD_DIR" ]; then
+        mkdir -p $UPLOAD_DIR;
+fi
+
+if [ ! -d "$DOWNLOAD_DIR" ]; then
+        mkdir -p $DOWNLOAD_DIR;
+fi
+
+cd $HOME_DIR
+
+# source environmental variables
+source $PROFILE_PATH
+
+# activate virtual environment
+source $VENV_PATH
+
+# copy gdrive to FastqQAQC
+echo "${0}: [$(date -u)] ***copy gdrive to FastqQAQC"
+$RCLONE_PATH sync gdrive:FastqQAQC/ $DOWNLOAD_DIR -P --update --min-age 15m --log-file=$GDRIVE_DOWNLOAD_LOG_FILE --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
+
+# run_server_parse to check if all fastq from run exist
+echo "${0}: [$(date -u)] ***run_seq_parse to check if all fastq from run exist"
+python ${HOME_DIR}/mytardis-mydata-parser/run_seq_parse.py
+
+# after parse, upload to MyTardis
+# cd into upload directory
+cd $UPLOAD_DIR
+# if files exist that were created within the last 24 hours, then upload to mytardis
+echo "${0}: [$(date -u)] ***if files exist that were created within the last 24 hours, then upload to mytardis"
+if find "$UPLOAD_DIR" -type f -mtime -1 | read; then
+        #mydata scan -v
+        mydata upload -v
+fi
+# return to ome directory
+cd $HOME_DIR
+# first, check if dir has files in it, if it does  remove contents of upload directory (otherwise it will continuously accumulate)
+echo "${0}: [$(date -u)] ***if dir has files in it, if it does remove contents of upload directory (otherwise it will continuously accumulate)"
+if [ -d "$UPLOAD_DIR" ]
+then
+        if [ "$(ls -A $UPLOAD_DIR)" ]; then
+                # dir is not empty
+                rm -rv $UPLOAD_DIR/*
+        fi
+fi
+
+echo "${0}: [$(date -u)] ***DONE rclone-cron-server.sh"
+
+exit

@@ -5,12 +5,17 @@ if pidof -o %PPID -x "$CRON_SCRIPT"; then
         exit 1
 fi
 
+echo "${0}: [$(date -u)] ***START rclone-cron.sh"
+
 # set variables
 HOME_DIR=/path/to/home/dir
 PROFILE_PATH=${HOME_DIR}/.profile
-VENV_PATH=/path/to/.virtualenvs/venv/bin/activate
+VENV_PATH=${HOME_DIR}/.virtualenvs/mytd-env/bin/activate
 RCLONE_PATH=/path/to/rclone
-UPLOAD_DIR=/path/to/upload/dir
+MEDNA_DIR=/path/to/mount
+MEDNA_UPLOAD_DIR=${MEDNA_DIR}/upload/dir
+MEDNA_DOWNLOAD_DIR=${MEDNA_DIR}/download/dir
+MEDNA_PROJECT_DIR=${MEDNA_DIR}/project/dir
 WASABI_FILTER_FILE=${HOME_DIR}/mytardis-mydata-parser/configs/filter-wasabi-files.txt
 WASABI_LOG_FILE=${HOME_DIR}/wasabi-download.log
 MEDNA_GDRIVE_FILTER_FILE=${HOME_DIR}/mytardis-mydata-parser/configs/medna_filter-gdrive-files.txt
@@ -25,22 +30,36 @@ source $PROFILE_PATH
 source $VENV_PATH
 
 # copy wasabi to TACC
-$RCLONE_PATH copy source:directory/ destination:directory/ -P --update --min-age 15m --filter-from $WASABI_FILTER_FILE --log-file=$WASABI_LOG_FILE --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
+echo "${0}: [$(date -u)] ***copy wasabi to TACC"
+$RCLONE_PATH copy source:directory/ $MEDNA_DOWNLOAD_DIR -P --update --min-age 15m --filter-from $WASABI_FILTER_FILE --log-file=$WASABI_LOG_FILE --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
 # run_server_parse to check if all fastq from run exist
+echo "${0}: [$(date -u)] ***run_server_parse to check if all fastq from run exist"
 python ${HOME_DIR}/mytardis-mydata-parser/run_server_parse.py
 
 # run_mytardis_api to generate list of directories to filter RClone to GDrive by project (maine-edna)
+echo "${0}: [$(date -u)] ***run_mytardis_api to generate list of directories to filter RClone to GDrive by project (maine-edna)"
 python ${HOME_DIR}/mytardis-mydata-parser/run_mytardis_api.py
 # copy wasabi to gdrive based on dataset filter
+echo "${0}: [$(date -u)] ***copy wasabi to gdrive based on dataset filter"
 $RCLONE_PATH copy source:directory/ destination:directory/ -P --update --min-age 15m --filter-from $MEDNA_GDRIVE_FILTER_FILE --log-file=$GDRIVE_LOG_FILE --create-empty-src-dirs --ignore-case --ignore-checksum --ignore-size --s3-upload-cutoff 0 --no-gzip-encoding
 
 # cd into upload directory
-cd $UPLOAD_DIR
+cd $MEDNA_UPLOAD_DIR
 # if files exist that were created within the last 24 hours, then upload to mytardis
-if find "$UPLOAD_DIR" -type f -mtime -1 | read; then
+echo "${0}: [$(date -u)] ***if files exist that were created within the last 24 hours, then upload to mytardis"
+if find "$MEDNA_UPLOAD_DIR" -type f -mtime -1 | read; then
         #mydata scan -v
         mydata upload -v
 fi
+
+chmod -R 774 $MEDNA_UPLOAD_DIR
+
+setfacl -Rm g:READGROUP:r $MEDNA_PROJECT_DIR
+setfacl -Rm g:READWRITEGROUP:rwx $MEDNA_PROJECT_DIR
+
 # return to home directory
 cd $HOME_DIR
+
+echo "${0}: [$(date -u)] ***DONE rclone-cron.sh"
+
 exit
