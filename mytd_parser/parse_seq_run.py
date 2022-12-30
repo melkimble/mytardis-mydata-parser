@@ -267,7 +267,7 @@ def get_fastq_num_runid_gsheets(run_id):
 
         spreadsheet = gc.open_by_url(target_spreadsheet_name)
 
-        worksheet = spreadsheet.worksheet("Form Responses 1")
+        worksheet = spreadsheet.worksheet(settings.GSHEETS_WORKSHEET_NAME)
 
         # finding the cell with the header "number of fastq files" gives us the column
         fastq_cell = worksheet.find("Number of FASTQ files")

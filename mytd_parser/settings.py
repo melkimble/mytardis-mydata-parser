@@ -44,3 +44,4 @@ MAINE_EDNA_RCLONE_GDRIVE_FILTER_FILENAME = "medna_filter-gdrive-files"
 # GDrive FastqUpload
 GDRIVE_PRIVATE_KEY = RCLONE_FILTER_FILE_DIR+"your_gdrive_key_file.json"
 GSHEETS_SPREADSHEET_URL = "https://your_gsheet_url"
+GSHEETS_WORKSHEET_NAME = "your_worksheet_name"
