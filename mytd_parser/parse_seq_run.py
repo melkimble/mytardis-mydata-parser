@@ -549,14 +549,26 @@ class MiSeqParser:
             if export_csv:
                 output_csv_filename = self.log_file_dir + 'seq_dirlist.csv'
                 if os.path.exists(output_csv_filename):
+                    # print(output_csv_filename)
+                    api_logger.info('[GET DIRS] dirs_df_old: ' +
+                                    ' [(' + output_csv_filename + ']')
                     dirs_df_old = pd.read_csv(output_csv_filename)
-                    dirs_df_old = dirs_df_old.set_index('run_id')
-                    dirs_df_id = dirs_df.copy()
-                    dirs_df_id = dirs_df_id.set_index('run_id')
-                    # merge the existing and new dirs_df and update fields based on run_id
-                    dirs_df_new = dirs_df_id.combine_first(dirs_df_old).reset_index()
-                    dirs_df_new.to_csv(output_csv_filename, encoding='utf-8', index=False, header=True)
+                    if not dirs_df_old.empty:
+                        dirs_df_old = dirs_df_old.set_index('run_id')
+                        dirs_df_id = dirs_df.copy()
+                        dirs_df_id = dirs_df_id.set_index('run_id')
+                        # merge the existing and new dirs_df and update fields based on run_id
+                        dirs_df_new = dirs_df_id.combine_first(dirs_df_old).reset_index()
+                        dirs_df_new.to_csv(output_csv_filename, encoding='utf-8', index=False, header=True)
+                    else:
+                        api_logger.info('[GET DIRS] dirs_df_new: ' +
+                                        ' [(' + output_csv_filename + ']')
+                        dirs_df_id = dirs_df.copy()
+                        dirs_df_id = dirs_df_id.set_index('run_id')
+                        dirs_df_id.to_csv(output_csv_filename, encoding='utf-8', index=True)
                 else:
+                    api_logger.info('[GET DIRS] dirs_df_new: ' +
+                                    ' [(' + output_csv_filename + ']')
                     dirs_df_id = dirs_df.copy()
                     dirs_df_id = dirs_df_id.set_index('run_id')
                     dirs_df_id.to_csv(output_csv_filename, encoding='utf-8', index=True)
