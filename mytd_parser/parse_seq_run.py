@@ -254,7 +254,7 @@ def get_sampleid_primerpair_name(sample_id):
         raise RuntimeError("** Error: get_sampleid_primerpair_name Failed (" + str(err) + ")")
 
 
-def get_gsheet():
+def get_fastq_num_runid_gsheets(run_id):
     try:
         gdrive_private_key = settings.GDRIVE_PRIVATE_KEY
         target_spreadsheet_name = settings.GSHEETS_SPREADSHEET_URL
@@ -268,14 +268,6 @@ def get_gsheet():
         spreadsheet = gc.open_by_url(target_spreadsheet_name)
 
         worksheet = spreadsheet.worksheet(settings.GSHEETS_WORKSHEET_NAME)
-        return worksheet
-    except Exception as err:
-        raise RuntimeError("** Error: get_gsheet Failed (" + str(err) + ")")
-
-
-def get_fastq_num_runid_gsheets(run_id):
-    try:
-        worksheet = get_gsheet()
 
         # finding the cell with the header "number of fastq files" gives us the column
         fastq_cell = worksheet.find("Number of FASTQ files")
@@ -292,7 +284,18 @@ def get_fastq_num_runid_gsheets(run_id):
 
 def update_parse_status_runid_gsheets(run_id):
     try:
-        worksheet = get_gsheet()
+        gdrive_private_key = settings.GDRIVE_PRIVATE_KEY
+        target_spreadsheet_name = settings.GSHEETS_SPREADSHEET_URL
+
+        scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
+                 "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
+        # JSON API file from google drive API
+        credentials = ServiceAccountCredentials.from_json_keyfile_name(gdrive_private_key, scope)
+        gc = gspread.authorize(credentials)
+
+        spreadsheet = gc.open_by_url(target_spreadsheet_name)
+
+        worksheet = spreadsheet.worksheet(settings.GSHEETS_WORKSHEET_NAME)
 
         # finding the cell with the header "number of fastq files" gives us the column
         parse_status_cell = worksheet.find("SERVER_PARSE_COMPLETE")
