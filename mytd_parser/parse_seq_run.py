@@ -282,8 +282,11 @@ def get_fastq_num_runid_gsheets(worksheet, run_id):
         # finding the cell that matches the RunID of the parsed run gives us the row
         runid_cell = worksheet.find(run_id)
 
-        # value at cell that matches row, col
-        num_fastq_gsheets = worksheet.cell(runid_cell.row, fastq_cell.col).value
+        if runid_cell is not None:
+            # value at cell that matches row, col
+            num_fastq_gsheets = worksheet.cell(runid_cell.row, fastq_cell.col).value
+        else:
+            num_fastq_gsheets = None
 
         return num_fastq_gsheets
     except Exception as err:
@@ -612,9 +615,16 @@ class MiSeqParser:
                 if check_gdrive:
                     # worksheet = get_gsheet()
                     num_fastq_gsheets = get_fastq_num_runid_gsheets(worksheet, run_id)
+
                     api_logger.info('[CHECK GDRIVE] check_gdrive (num_fastq_gsheets): ' +
                                     ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
                                     project + ', ' + run_id + ',' + fastq_dir + ']')
+                    if num_fastq_gsheets is None:
+                        # if num_fastq_gsheets is None, then nothing returned on lookup via gspread.
+                        api_logger.info('[INCOMPLETE RUN] [NO GDRIVE LOOKUP MATCH] parse_fastq_files (num_fastq_gsheets): ' +
+                                        ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
+                                        project + ', ' + run_id + ',' + fastq_dir + ']')
+                        continue
                     if str(num_fastq_gsheets) != str(num_fastq_files):
                         # log info
                         api_logger.info('[INCOMPLETE RUN] parse_fastq_files (num_fastq_gsheets): ' +
@@ -748,6 +758,12 @@ class MiSeqParser:
                     api_logger.info('[CHECK GDRIVE] check_gdrive (num_fastq_gsheets): ' +
                                     ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
                                     project + ', ' + run_id + ',' + fastq_dir + ']')
+                    if num_fastq_gsheets is None:
+                        # if num_fastq_gsheets is None, then nothing returned on lookup via gspread.
+                        api_logger.info('[INCOMPLETE RUN] [NO GDRIVE LOOKUP MATCH] parse_fastq_files (num_fastq_gsheets): ' +
+                                        ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
+                                        project + ', ' + run_id + ',' + fastq_dir + ']')
+                        continue
                     if str(num_fastq_gsheets) != str(num_fastq_files):
                         # log info
                         api_logger.info('[INCOMPLETE RUN] parse_fastq_files (num_fastq_gsheets): ' +
@@ -880,6 +896,12 @@ class MiSeqParser:
                     api_logger.info('[CHECK GDRIVE] check_gdrive (num_fastq_gsheets): ' +
                                     ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
                                     project + ', ' + run_id + ',' + fastq_dir + ']')
+                    if num_fastq_gsheets is None:
+                        # if num_fastq_gsheets is None, then nothing returned on lookup via gspread.
+                        api_logger.info('[INCOMPLETE RUN] [NO GDRIVE LOOKUP MATCH] parse_fastq_files (num_fastq_gsheets): ' +
+                                        ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
+                                        project + ', ' + run_id + ',' + fastq_dir + ']')
+                        continue
                     if str(num_fastq_gsheets) != str(num_fastq_files):
                         # log info
                         api_logger.info('[INCOMPLETE RUN] parse_fastq_files (num_fastq_gsheets): ' +
@@ -1475,6 +1497,12 @@ class GenericParser(MiSeqParser):
                     api_logger.info('[CHECK GDRIVE] check_gdrive (num_fastq_gsheets): ' +
                                     ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
                                     project + ', ' + run_id + ',' + fastq_dir + ']')
+                    if num_fastq_gsheets is None:
+                        # if num_fastq_gsheets is None, then nothing returned on lookup via gspread.
+                        api_logger.info('[INCOMPLETE RUN] [NO GDRIVE LOOKUP MATCH] parse_fastq_files (num_fastq_gsheets): ' +
+                                        ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
+                                        project + ', ' + run_id + ',' + fastq_dir + ']')
+                        continue
                     if str(num_fastq_gsheets) != str(num_fastq_files):
                         # log info
                         api_logger.info('[INCOMPLETE RUN] parse_fastq_files (num_fastq_gsheets): ' +
@@ -1588,6 +1616,12 @@ class GenericParser(MiSeqParser):
                     api_logger.info('[CHECK GDRIVE] check_gdrive (num_fastq_gsheets): ' +
                                     ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
                                     project + ', ' + run_id + ',' + fastq_dir + ']')
+                    if num_fastq_gsheets is None:
+                        # if num_fastq_gsheets is None, then nothing returned on lookup via gspread.
+                        api_logger.info('[INCOMPLETE RUN] [NO GDRIVE LOOKUP MATCH] parse_fastq_files (num_fastq_gsheets): ' +
+                                        ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
+                                        project + ', ' + run_id + ',' + fastq_dir + ']')
+                        continue
                     if str(num_fastq_gsheets) != str(num_fastq_files):
                         # log info
                         api_logger.info('[INCOMPLETE RUN] parse_fastq_files (num_fastq_gsheets): ' +
@@ -1699,6 +1733,12 @@ class GenericParser(MiSeqParser):
                     api_logger.info('[CHECK GDRIVE] check_gdrive (num_fastq_gsheets): ' +
                                     ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
                                     project + ', ' + run_id + ',' + fastq_dir + ']')
+                    if num_fastq_gsheets is None:
+                        # if num_fastq_gsheets is None, then nothing returned on lookup via gspread.
+                        api_logger.info('[INCOMPLETE RUN] [NO GDRIVE LOOKUP MATCH] parse_fastq_files (num_fastq_gsheets): ' +
+                                        ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
+                                        project + ', ' + run_id + ',' + fastq_dir + ']')
+                        continue
                     if str(num_fastq_gsheets) != str(num_fastq_files):
                         # log info
                         api_logger.info('[INCOMPLETE RUN] parse_fastq_files (num_fastq_gsheets): ' +
