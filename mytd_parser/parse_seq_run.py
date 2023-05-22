@@ -254,7 +254,7 @@ def get_sampleid_primerpair_name(sample_id):
         raise RuntimeError("** Error: get_sampleid_primerpair_name Failed (" + str(err) + ")")
 
 
-def get_fastq_num_runid_gsheets(run_id):
+def get_gsheet():
     try:
         gdrive_private_key = settings.GDRIVE_PRIVATE_KEY
         target_spreadsheet_name = settings.GSHEETS_SPREADSHEET_URL
@@ -268,6 +268,14 @@ def get_fastq_num_runid_gsheets(run_id):
         spreadsheet = gc.open_by_url(target_spreadsheet_name)
 
         worksheet = spreadsheet.worksheet(settings.GSHEETS_WORKSHEET_NAME)
+        return worksheet
+    except Exception as err:
+        raise RuntimeError("** Error: get_gsheet Failed (" + str(err) + ")")
+
+
+def get_fastq_num_runid_gsheets(worksheet, run_id):
+    try:
+        # worksheet = get_gsheet()
 
         # finding the cell with the header "number of fastq files" gives us the column
         fastq_cell = worksheet.find("Number of FASTQ files")
@@ -282,20 +290,9 @@ def get_fastq_num_runid_gsheets(run_id):
         raise RuntimeError("** Error: get_fastq_num_runid_gsheets Failed (" + str(err) + ")")
 
 
-def update_parse_status_runid_gsheets(run_id):
+def update_parse_status_runid_gsheets(worksheet, run_id):
     try:
-        gdrive_private_key = settings.GDRIVE_PRIVATE_KEY
-        target_spreadsheet_name = settings.GSHEETS_SPREADSHEET_URL
-
-        scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
-                 "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
-        # JSON API file from google drive API
-        credentials = ServiceAccountCredentials.from_json_keyfile_name(gdrive_private_key, scope)
-        gc = gspread.authorize(credentials)
-
-        spreadsheet = gc.open_by_url(target_spreadsheet_name)
-
-        worksheet = spreadsheet.worksheet(settings.GSHEETS_WORKSHEET_NAME)
+        # worksheet = get_gsheet()
 
         # finding the cell with the header "number of fastq files" gives us the column
         parse_status_cell = worksheet.find("SERVER_PARSE_COMPLETE")
@@ -385,6 +382,8 @@ class MiSeqParser:
         self.run_dir = run_dir
         self.num_run_dir = num_run_dir
         self.check_gdrive = check_gdrive
+        # gsheet
+        self.worksheet = get_gsheet()
 
     def get_dirs(self, export_csv=True, rta_complete=True):
         """
@@ -592,6 +591,7 @@ class MiSeqParser:
             dirs_df = self.get_dirs(export_csv=True, rta_complete=True)
             output_dir = self.output_dir
             check_gdrive = self.check_gdrive
+            worksheet = self.worksheet
             align_counter = 1
             for index, row in dirs_df.iterrows():
                 num_align_subdir = row['num_align_subdir']
@@ -611,7 +611,7 @@ class MiSeqParser:
 
                 if check_gdrive:
                     # worksheet = get_gsheet()
-                    num_fastq_gsheets = get_fastq_num_runid_gsheets(run_id)
+                    num_fastq_gsheets = get_fastq_num_runid_gsheets(worksheet, run_id)
                     api_logger.info('[CHECK GDRIVE] check_gdrive (num_fastq_gsheets): ' +
                                     ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
                                     project + ', ' + run_id + ',' + fastq_dir + ']')
@@ -725,6 +725,8 @@ class MiSeqParser:
             dirs_df = self.copy_metadata_dirs(ignore_dirs=True)
             output_dir = self.output_dir
             check_gdrive = self.check_gdrive
+            worksheet = self.worksheet
+
             for index, row in dirs_df.iterrows():
                 num_align_subdir = row['num_align_subdir']
                 project = row['project']
@@ -742,7 +744,7 @@ class MiSeqParser:
                 num_fastq_files = row['num_fastq_files']
 
                 if check_gdrive:
-                    num_fastq_gsheets = get_fastq_num_runid_gsheets(run_id)
+                    num_fastq_gsheets = get_fastq_num_runid_gsheets(worksheet, run_id)
                     api_logger.info('[CHECK GDRIVE] check_gdrive (num_fastq_gsheets): ' +
                                     ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
                                     project + ', ' + run_id + ',' + fastq_dir + ']')
@@ -855,6 +857,7 @@ class MiSeqParser:
             dirs_df = self.parse_fastq_metadata_dirs()
             output_dir = self.output_dir
             check_gdrive = self.check_gdrive
+            worksheet = self.worksheet
 
             for index, row in dirs_df.iterrows():
                 num_align_subdir = row['num_align_subdir']
@@ -873,7 +876,7 @@ class MiSeqParser:
                 num_fastq_files = row['num_fastq_files']
 
                 if check_gdrive:
-                    num_fastq_gsheets = get_fastq_num_runid_gsheets(run_id)
+                    num_fastq_gsheets = get_fastq_num_runid_gsheets(worksheet, run_id)
                     api_logger.info('[CHECK GDRIVE] check_gdrive (num_fastq_gsheets): ' +
                                     ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
                                     project + ', ' + run_id + ',' + fastq_dir + ']')
@@ -1449,6 +1452,7 @@ class GenericParser(MiSeqParser):
             dirs_df = self.get_dirs(export_csv=True, rta_complete=True)
             output_dir = self.output_dir
             check_gdrive = self.check_gdrive
+            worksheet = self.worksheet
 
             for index, row in dirs_df.iterrows():
                 project = row['project']
@@ -1467,7 +1471,7 @@ class GenericParser(MiSeqParser):
                 num_fastq_files = row['num_fastq_files']
 
                 if check_gdrive:
-                    num_fastq_gsheets = get_fastq_num_runid_gsheets(run_id)
+                    num_fastq_gsheets = get_fastq_num_runid_gsheets(worksheet, run_id)
                     api_logger.info('[CHECK GDRIVE] check_gdrive (num_fastq_gsheets): ' +
                                     ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
                                     project + ', ' + run_id + ',' + fastq_dir + ']')
@@ -1561,7 +1565,7 @@ class GenericParser(MiSeqParser):
             dirs_df = self.copy_metadata_dirs(ignore_dirs=True)
             output_dir = self.output_dir
             check_gdrive = self.check_gdrive
-
+            worksheet = self.worksheet
             for index, row in dirs_df.iterrows():
                 # num_align_subdir = row['num_align_subdir']
                 project = row['project']
@@ -1580,7 +1584,7 @@ class GenericParser(MiSeqParser):
                 num_fastq_files = row['num_fastq_files']
 
                 if check_gdrive:
-                    num_fastq_gsheets = get_fastq_num_runid_gsheets(run_id)
+                    num_fastq_gsheets = get_fastq_num_runid_gsheets(worksheet, run_id)
                     api_logger.info('[CHECK GDRIVE] check_gdrive (num_fastq_gsheets): ' +
                                     ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
                                     project + ', ' + run_id + ',' + fastq_dir + ']')
@@ -1672,6 +1676,7 @@ class GenericParser(MiSeqParser):
             dirs_df = self.parse_fastq_metadata_dirs()
             output_dir = self.output_dir
             check_gdrive = self.check_gdrive
+            worksheet = self.worksheet
 
             for index, row in dirs_df.iterrows():
                 # num_align_subdir = row['num_align_subdir']
@@ -1690,7 +1695,7 @@ class GenericParser(MiSeqParser):
                 run_id = row['run_id']
 
                 if check_gdrive:
-                    num_fastq_gsheets = get_fastq_num_runid_gsheets(run_id)
+                    num_fastq_gsheets = get_fastq_num_runid_gsheets(worksheet, run_id)
                     api_logger.info('[CHECK GDRIVE] check_gdrive (num_fastq_gsheets): ' +
                                     ' [(' + str(num_fastq_files) + '/' + str(num_fastq_gsheets) + '), ' +
                                     project + ', ' + run_id + ',' + fastq_dir + ']')
